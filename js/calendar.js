@@ -35,28 +35,27 @@ function renderCare(start, end) {
 
   const rows = [];
   // 반복 케어(투약): 오늘이면 바로 체크, 아니면 다음 날짜 + 이번 달 기록
-  for (const ev of care.filter((x) => x.rep && (!x.until || x.until >= today))) {
-    const next = nextOccurrence(ev, today);
-    let sched = 0, given = 0;
-    for (let k = start; k <= end && k <= today; k = addDays(k, 1)) {
-      if (!occursOn(ev, k)) continue;
-      sched++;
-      if (isDone(ev, k)) given++;
-    }
-    const todayDose = next === today;
+  for (const ev of care.filter((x) => x.rep && ((!x.until || x.until >= today) || overridesOf(x).some((o) => o.date >= today)))) {
+    // 이 날만 바꾼 회차도 같은 투약으로 센다
+    const next = nextOfSeries(ev, today);
+    const past = seriesDays(ev, start, end < today ? end : today);
+    const sched = past.length;
+    const given = past.filter((d) => isDone(d.ev, d.k)).length;
+    const todayDose = next && next.k === today;
+    const doneToday = todayDose && isDone(next.ev, today);
     const status = todayDose
-      ? (isDone(ev, today) ? '<b class="ok">오늘 완료</b>' : '<b>오늘이에요</b>')
-      : next ? `다음 ${relDay(next)} · ${mdw(next)}` : '일정 끝남';
-    rows.push(`<li class="care-row" data-eid="${ev.id}" data-k="${next || today}">
+      ? (doneToday ? '<b class="ok">오늘 완료</b>' : '<b>오늘이에요</b>')
+      : next ? `다음 ${relDay(next.k)} · ${mdw(next.k)}` : '일정 끝남';
+    rows.push(`<li class="care-row" data-eid="${next ? next.ev.id : ev.id}" data-k="${next ? next.k : today}">
       <span class="care-ic">${PILL_SVG}</span>
       <span class="care-body"><span class="care-title">${esc(ev.title)} <small>${repLabel(ev.rep)}</small></span>
         <span class="care-sub">${status}${sched ? ` · 이번 달 ${given}/${sched}회 기록` : ''}</span></span>
-      ${todayDose ? `<button class="ev-check${isDone(ev, today) ? ' on' : ''}" aria-pressed="${isDone(ev, today)}" aria-label="오늘 ${esc(ev.title)} 완료">${CHECK_SVG}</button>` : ''}
+      ${todayDose ? `<button class="ev-check" aria-pressed="${doneToday}" aria-label="오늘 ${esc(ev.title)} 완료">${CHECK_SVG}</button>` : ''}
     </li>`);
   }
   // 반복 없는 케어(병원 진료 등): 가장 가까운 다음 일정
   const visits = care
-    .filter((x) => !x.rep && x.date >= today)
+    .filter((x) => !x.rep && !x.of && x.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
   if (visits.length) {
     const v = visits[0];
@@ -98,8 +97,8 @@ function renderMonthGrid(start, end) {
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const evs = eventsOn(k);
     // 반복 케어(투약)는 칸을 차지하지 않게 날짜 옆 작은 알약 표시로만 보여 준다
-    const doses = evs.filter((ev) => checkable(ev) && ev.rep);
-    const shown = evs.filter((ev) => !(checkable(ev) && ev.rep));
+    const doses = evs.filter(isDose);
+    const shown = evs.filter((ev) => !isDose(ev));
     let dose = '';
     if (doses.length) {
       doseSeen = true;
@@ -167,7 +166,7 @@ bindEventList($('day-panel'));
 function renderUpcoming() {
   const limit = addDays(today, UPCOMING_DAYS);
   const list = state.events
-    .filter((ev) => !ev.rep && ev.date >= today && ev.date <= limit)
+    .filter((ev) => !ev.rep && !ev.of && ev.date >= today && ev.date <= limit)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     .slice(0, 6);
   $('upcoming').innerHTML = list.length

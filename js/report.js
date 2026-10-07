@@ -117,25 +117,25 @@ function analyze(id) {
   m.rate = m.total ? m.done / m.total : null;
 
   // 케어: 반복(투약)은 예정 대비 기록, 반복 없는 케어(진료)는 다녀온 횟수
+  // (이 날만 바꾼 회차는 원래 반복 일정의 투약으로 센다)
   m.care = state.events.filter((ev) => checkable(ev) && ev.rep).map((ev) => {
     const c = { ev, sched: 0, given: 0, missed: [] };
-    for (let k = start; k <= last; k = addDays(k, 1)) {
-      if (!occursOn(ev, k)) continue;
+    for (const d of seriesDays(ev, start, last)) {
       c.sched++;
-      if (isDone(ev, k)) c.given++; else c.missed.push(k);
+      if (isDone(d.ev, d.k)) c.given++; else c.missed.push(d.k);
     }
     return c;
   }).filter((c) => c.sched > 0);
   m.careSched = m.care.reduce((a, c) => a + c.sched, 0);
   m.careGiven = m.care.reduce((a, c) => a + c.given, 0);
   m.visits = state.events
-    .filter((ev) => checkable(ev) && !ev.rep && ev.date >= start && ev.date <= last)
+    .filter((ev) => checkable(ev) && !ev.rep && !ev.of && ev.date >= start && ev.date <= last)
     .map((ev) => ({ ev, done: isDone(ev, ev.date) }));
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
   for (const ev of state.events) {
-    if (checkable(ev) && ev.rep) continue;
+    if (isDose(ev)) continue;
     for (let k = ev.date > start ? ev.date : start; k <= end && (!ev.until || k <= ev.until); k = addDays(k, 1)) {
       if (occursOn(ev, k)) m.evCount[ev.cat]++;
       if (!ev.rep) break;
@@ -337,7 +337,7 @@ function renderReport(id) {
   const nextEnd = m.yearly ? `${+id + 1}-12-31` : monthEnd(nextStart);
   if (m.end < today && today <= nextEnd) {
     const list = state.events
-      .filter((x) => !x.rep && x.date >= today && x.date <= nextEnd)
+      .filter((x) => !x.rep && !x.of && x.date >= today && x.date <= nextEnd)
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 6);
     if (list.length) {

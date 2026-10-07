@@ -17,6 +17,31 @@ const CROSS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12
 /* 케어 일정은 날마다 '했음'을 체크해 기록한다 (투약, 병원 다녀옴) */
 const checkable = (ev) => ev.cat === 'care';
 
+/* '이 날만 바꾸기'로 만든 일정은 원래 반복의 한 회차다: of = 반복 일정 id, ok = 원래 날짜.
+ * 반복 쪽에서는 그 날짜가 ex로 빠지고, 이 일정이 대신 그 회차를 맡는다. */
+const seriesOf = (ev) => (ev.of ? state.events.find((x) => x.id === ev.of && x.rep) : null);
+const overridesOf = (series) => state.events.filter((x) => x.of === series.id);
+/* 투약처럼 반복되는 케어 회차 (반복 일정 자체 + 이 날만 바꾼 회차) — 달력에선 알약 표시, 리포트에선 투약 기록 */
+const isDose = (ev) => checkable(ev) && !!(ev.rep || ev.of);
+
+/* 반복 일정의 from–to 사이 회차들 (이 날만 바꾼 회차 포함): [{ ev, k }] */
+function seriesDays(series, from, to) {
+  const out = [];
+  for (let k = from > series.date ? from : series.date; k <= to && (!series.until || k <= series.until); k = addDays(k, 1)) {
+    if (occursOn(series, k)) out.push({ ev: series, k });
+  }
+  for (const o of overridesOf(series)) if (o.date >= from && o.date <= to) out.push({ ev: o, k: o.date });
+  return out.sort((a, b) => a.k.localeCompare(b.k));
+}
+
+/* 반복 일정의 다음 회차 (이 날만 바꾼 회차 포함): { ev, k } | null */
+function nextOfSeries(series, from) {
+  const cands = overridesOf(series).filter((o) => o.date >= from).map((o) => ({ ev: o, k: o.date }));
+  const n = nextOccurrence(series, from);
+  if (n) cands.push({ ev: series, k: n });
+  return cands.sort((a, b) => a.k.localeCompare(b.k))[0] || null;
+}
+
 function occursOn(ev, k) {
   if (k < ev.date) return false;
   if (ev.until && k > ev.until) return false;
@@ -66,7 +91,8 @@ function toggleEventDone(id, k) {
 /* 오늘 화면·캘린더에서 같이 쓰는 일정 한 줄 */
 function eventRow(ev, k) {
   const done = isDone(ev, k);
-  const meta = [CATS[ev.cat].label, repLabel(ev.rep)].filter(Boolean).join(' · ');
+  const changed = ev.of ? (ev.ok && ev.ok !== ev.date ? `이 날만 변경 (원래 ${md(ev.ok)})` : '이 날만 변경') : '';
+  const meta = [CATS[ev.cat].label, repLabel(ev.rep), changed].filter(Boolean).join(' · ');
   const late = checkable(ev) && !done && k < today;
   return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}" data-eid="${ev.id}" data-k="${k}">
     <span class="ev-time">${ev.time || '종일'}</span>
@@ -111,6 +137,7 @@ function openSheet({ id = null, k = ui.calSel || today, preset = null } = {}) {
   $('ev-rep').value = repKey(src.rep);
   $('ev-memo').value = src.memo || '';
   $('ev-del').hidden = !ev;
+  $('ev-revert').hidden = !(ev && seriesOf(ev));
   $('sheet').hidden = false;
   if (!ev && !preset) setTimeout(() => $('ev-title').focus(), 50);
 }
@@ -152,6 +179,18 @@ function splitAt(ev, k) {
   return later;
 }
 
+/* 반복 일정의 k일 회차만 바꾼다: 반복에서 그 날을 빼고(ex), 바꾼 내용으로 한 번짜리 일정을 만든다 */
+function overrideOne(series, k, f) {
+  series.ex = [...new Set([...(series.ex || []), k])];
+  const one = { id: uid(), ...f, of: series.id, ok: k };
+  delete one.rep;
+  if (series.done && series.done[k]) {
+    one.done = { [one.date]: series.done[k] };
+    delete series.done[k];
+  }
+  state.events.push(one);
+}
+
 $('ev-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = readForm();
@@ -170,18 +209,22 @@ $('ev-form').addEventListener('submit', async (e) => {
 
   let scope = 'all';
   if (ev.rep) {
-    scope = await choose('반복 일정이에요. 어디부터 바꿀까요?', [
+    scope = await choose('반복 일정이에요. 어떻게 바꿀까요?', [
+      { label: '이 날만 바꾸기', value: 'one' },
       { label: '이 날부터 바꾸기', value: 'after' },
       { label: '모든 반복 일정 바꾸기', value: 'all' },
     ]);
     if (!scope) return;
   }
 
-  if (scope === 'all') {
+  if (scope === 'one') {
+    overrideOne(ev, ctx.k, f);
+  } else if (scope === 'all') {
     // 날짜를 옮겼다면 반복 시작일도 같은 만큼 옮긴다
     const next = { id: ev.id, ...f, date: f.rep ? addDays(ev.date, diffDays(f.date, ctx.k)) : f.date };
     if (f.rep && ev.until) next.until = ev.until;
     if (f.rep && ev.ex) next.ex = ev.ex;
+    if (!f.rep && ev.of) { next.of = ev.of; next.ok = ev.ok; } // 이 날만 바꾼 회차를 다시 고칠 때
     if (ev.done) next.done = ev.done;
     state.events[state.events.indexOf(ev)] = next;
   } else {
@@ -189,6 +232,8 @@ $('ev-form').addEventListener('submit', async (e) => {
     const next = { id: uid(), ...f };
     if (Object.keys(later).length) next.done = later;
     state.events.push(next);
+    // 이 날 이후에 따로 바꿔 둔 회차는 새 반복에 이어 붙인다
+    for (const o of overridesOf(ev)) if (o.ok >= ctx.k) o.of = next.id;
   }
   save();
   closeSheet();
@@ -216,10 +261,29 @@ $('ev-del').addEventListener('click', async () => {
       cur.ex = [...(cur.ex || []), ctx.k];
       if (cur.done) delete cur.done[ctx.k];
     } else if (scope === 'after') {
+      state.events = state.events.filter((x) => !(x.of === cur.id && x.ok >= ctx.k));
       splitAt(cur, ctx.k);
     } else {
-      state.events = state.events.filter((x) => x.id !== ctx.id);
+      // 반복 일정을 모두 지우면 이 날만 바꿔 둔 회차도 함께 지운다
+      state.events = state.events.filter((x) => x.id !== ctx.id && x.of !== ctx.id);
     }
+  });
+});
+
+/* 이 날만 바꾼 회차를 원래 반복 일정대로 되돌린다 */
+$('ev-revert').addEventListener('click', () => {
+  const ctx = sheetCtx;
+  closeSheet();
+  undoable('반복 일정대로 되돌렸어요', () => {
+    const one = state.events.find((x) => x.id === ctx.id);
+    const series = one && seriesOf(one);
+    if (!series) return;
+    series.ex = (series.ex || []).filter((d) => d !== one.ok);
+    if (!series.ex.length) delete series.ex;
+    if (one.done && one.done[one.date]) series.done = { ...(series.done || {}), [one.ok]: one.done[one.date] };
+    state.events = state.events.filter((x) => x !== one);
+    ui.calSel = one.ok;
+    ui.calMonth = monthStart(one.ok);
   });
 });
 

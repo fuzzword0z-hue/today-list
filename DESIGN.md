@@ -186,6 +186,7 @@
 - 순수 HTML + CSS + JavaScript, 빌드 도구·라이브러리 없음. 코드 약 110KB, 아이콘 포함 약 155KB.
 - `js/core.js`(저장·날짜·화면 전환) · `events.js`(일정·반복·시트) · `today.js` · `calendar.js` · `stats.js` · `report.js` · `main.js`
 - **PWA:** `manifest.webmanifest` + 서비스 워커(`sw.js`)로 홈 화면에 설치, 오프라인 실행.
+- **업데이트:** 한 버전의 파일을 한 캐시에 통째로 받아 두고 그 캐시에서만 꺼내 쓴다. 새 버전은 설치 단계에서 서버에서 직접(HTTP 캐시 무시) 전부 받은 뒤, 열려 있는 앱을 한 번 새로 고쳐 교체한다. CSS·JS 주소에 `?v=버전`을 붙여 GitHub Pages의 10분 브라우저 캐시와도 섞이지 않게 했다. *(v2 배포 때 '새 HTML + 옛 CSS'가 섞여 탭이 깨진 문제의 재발 방지)*
 - **저장:** `localStorage` 한 키(`today-list:v1`)에 JSON. 하루 10개씩 10년 써도 약 2–3MB.
 
 ```js

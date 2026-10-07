@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="오늘">
+  <meta name="description" content="오늘 할 일과 주·월·년 통계를 보는 가벼운 개인용 체크리스트">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <title>오늘</title>
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- ───────── 오늘 ───────── -->
+    <section class="view" id="view-today">
+      <header class="top">
+        <div class="top-row">
+          <span class="date-sub" id="date-sub">오늘</span>
+          <button class="pill" id="go-today" hidden>오늘로</button>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="to-stats" aria-label="통계 보기">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+          </button>
+        </div>
+        <div class="top-row">
+          <h1 class="date-main" id="date-main"></h1>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="prev-day" aria-label="이전 날">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button class="icon-btn" id="next-day" aria-label="다음 날">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="progress" id="progress">
+          <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          <span class="progress-label" id="progress-label"></span>
+        </div>
+      </header>
+
+      <main class="scroll" id="today-scroll">
+        <div class="banner" id="carry" hidden>
+          <span class="banner-text" id="carry-text"></span>
+          <button class="banner-act" id="carry-yes">오늘로 가져오기</button>
+          <button class="icon-btn small" id="carry-no" aria-label="닫기">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <ul class="list" id="list"></ul>
+        <div class="empty" id="empty" hidden>
+          <p class="empty-title">할 일을 적어 보세요</p>
+          <p class="empty-hint">탭 → 완료 · 길게 누르기 → 수정<br>← 밀기 → 삭제 · 밀기 → → 내일로</p>
+        </div>
+      </main>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <input id="new-task" type="text" maxlength="200" placeholder="할 일 추가" enterkeyhint="done" aria-label="할 일 추가">
+        <button type="submit" class="send" id="send" aria-label="추가" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- ───────── 통계 ───────── -->
+    <section class="view" id="view-stats" hidden>
+      <header class="top">
+        <div class="top-row">
+          <button class="icon-btn back" id="back" aria-label="오늘로 돌아가기">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <h1 class="date-main">통계</h1>
+        </div>
+        <div class="seg" role="tablist" id="seg">
+          <button role="tab" data-mode="week">주</button>
+          <button role="tab" data-mode="month">월</button>
+          <button role="tab" data-mode="year">년</button>
+        </div>
+      </header>
+
+      <main class="scroll stats">
+        <div class="streak" id="streak"></div>
+
+        <div class="period">
+          <button class="icon-btn" id="prev-period" aria-label="이전 기간">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <span class="period-label" id="period-label"></span>
+          <button class="icon-btn" id="next-period" aria-label="다음 기간">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <div class="cards" id="cards"></div>
+        <div class="chart" id="chart"></div>
+        <div class="legend" id="legend"></div>
+        <div class="detail" id="detail"></div>
+      </main>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span class="toast-msg"></span>
+      <button class="toast-undo" hidden>실행 취소</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

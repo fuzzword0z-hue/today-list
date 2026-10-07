@@ -39,7 +39,18 @@ fitViewport();
 
 /* ───────── 오프라인 / 설치 ───────── */
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    // 새 버전으로 바뀌면 한 번 새로 고침 (서비스 워커가 직접 다시 열지 못하는 브라우저 대비).
+    // 처음 설치할 때는 이전 버전이 없으므로 새로 고치지 않는다.
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) setTimeout(() => location.reload(), 1500);
+    });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // 홈 화면 앱은 며칠씩 열린 채로 남아 있으므로, 다시 볼 때마다 새 버전이 있는지 확인
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
 }
 // 브라우저가 저장 공간을 임의로 정리하지 않도록 요청
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});

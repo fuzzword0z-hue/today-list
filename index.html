@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="오늘">
-  <meta name="description" content="오늘 할 일과 주·월·년 통계를 보는 가벼운 개인용 체크리스트">
+  <meta name="description" content="오늘 할 일, 캘린더, 주·월·년 통계와 월간 리포트를 보는 가벼운 개인용 플래너">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -17,7 +17,7 @@
   <title>오늘</title>
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app" id="app" data-view="today">
 
     <!-- ───────── 오늘 ───────── -->
     <section class="view" id="view-today">
@@ -25,10 +25,6 @@
         <div class="top-row">
           <span class="date-sub" id="date-sub">오늘</span>
           <button class="pill" id="go-today" hidden>오늘로</button>
-          <span class="spacer"></span>
-          <button class="icon-btn" id="to-stats" aria-label="통계 보기">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
-          </button>
         </div>
         <div class="top-row">
           <h1 class="date-main" id="date-main"></h1>
@@ -47,6 +43,7 @@
       </header>
 
       <main class="scroll" id="today-scroll">
+        <div id="report-banners"></div>
         <div class="banner" id="carry" hidden>
           <span class="banner-text" id="carry-text"></span>
           <button class="banner-act" id="carry-yes">오늘로 가져오기</button>
@@ -54,6 +51,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
+        <ul class="ev-list" id="today-events"></ul>
         <ul class="list" id="list"></ul>
         <div class="empty" id="empty" hidden>
           <p class="empty-title">할 일을 적어 보세요</p>
@@ -69,13 +67,37 @@
       </form>
     </section>
 
+    <!-- ───────── 캘린더 ───────── -->
+    <section class="view" id="view-cal" hidden>
+      <header class="top">
+        <div class="top-row">
+          <h1 class="date-main" id="cal-title"></h1>
+          <button class="pill" id="cal-today" hidden>오늘</button>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="cal-prev" aria-label="이전 달">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button class="icon-btn" id="cal-next" aria-label="다음 달">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button class="icon-btn accent" id="cal-add" aria-label="일정 추가">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </header>
+      <main class="scroll">
+        <div class="care" id="care"></div>
+        <div class="month" id="month"></div>
+        <div class="cal-legend" id="cal-legend"></div>
+        <div class="day-panel" id="day-panel"></div>
+        <div class="upcoming" id="upcoming"></div>
+      </main>
+    </section>
+
     <!-- ───────── 통계 ───────── -->
     <section class="view" id="view-stats" hidden>
       <header class="top">
         <div class="top-row">
-          <button class="icon-btn back" id="back" aria-label="오늘로 돌아가기">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-          </button>
           <h1 class="date-main">통계</h1>
         </div>
         <div class="seg" role="tablist" id="seg">
@@ -102,8 +124,89 @@
         <div class="chart" id="chart"></div>
         <div class="legend" id="legend"></div>
         <div class="detail" id="detail"></div>
+        <button class="report-link" id="report-link" hidden></button>
       </main>
     </section>
+
+    <!-- ───────── 리포트 ───────── -->
+    <section class="view" id="view-report" hidden>
+      <header class="top">
+        <div class="top-row">
+          <button class="icon-btn back" id="report-back" aria-label="뒤로">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <h1 class="date-main" id="report-title"></h1>
+          <span class="spacer"></span>
+          <button class="pill" id="report-copy">텍스트 복사</button>
+        </div>
+      </header>
+      <main class="scroll report" id="report"></main>
+    </section>
+
+    <!-- ───────── 하단 탭 ───────── -->
+    <nav class="tabs" id="tabs" aria-label="화면">
+      <button data-tab="today">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/></svg>
+        <span>오늘</span>
+      </button>
+      <button data-tab="cal">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        <span>캘린더</span>
+      </button>
+      <button data-tab="stats">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+        <span>통계</span><i class="badge" id="stats-badge" hidden></i>
+      </button>
+    </nav>
+
+    <!-- ───────── 일정 추가/수정 시트 ───────── -->
+    <div class="sheet-wrap" id="sheet" hidden>
+      <div class="backdrop" data-close></div>
+      <form class="sheet" id="ev-form" autocomplete="off">
+        <div class="sheet-head">
+          <button type="button" class="sheet-btn" data-close>취소</button>
+          <h2 id="sheet-title">일정 추가</h2>
+          <button type="submit" class="sheet-btn strong">저장</button>
+        </div>
+        <input class="ev-title-input" id="ev-title" type="text" maxlength="100" placeholder="일정 이름 (예: 면접, 병원 진료)" required>
+        <div class="cat-pick" id="cat-pick" role="radiogroup" aria-label="분류">
+          <button type="button" role="radio" data-cat="work"><i></i>공적</button>
+          <button type="button" role="radio" data-cat="life"><i></i>사적</button>
+          <button type="button" role="radio" data-cat="care"><i></i>케어</button>
+        </div>
+        <p class="cat-hint" id="cat-hint"></p>
+        <div class="fields">
+          <label class="field"><span>날짜</span><input type="date" id="ev-date" required></label>
+          <label class="field"><span>시간</span>
+            <input type="time" id="ev-time">
+            <button type="button" class="field-clear" id="ev-time-clear">종일로</button>
+          </label>
+          <label class="field"><span>반복</span>
+            <select id="ev-rep">
+              <option value="">반복 안 함</option>
+              <option value="d1">매일</option>
+              <option value="d2">이틀마다</option>
+              <option value="d3">3일마다</option>
+              <option value="w1">매주</option>
+              <option value="w2">2주마다</option>
+              <option value="m1">매달</option>
+            </select>
+          </label>
+        </div>
+        <textarea class="ev-memo" id="ev-memo" rows="2" maxlength="500" placeholder="메모 (선택)"></textarea>
+        <button type="button" class="sheet-del" id="ev-del" hidden>일정 삭제</button>
+      </form>
+    </div>
+
+    <!-- 선택지 (반복 일정 수정·삭제 범위 등) -->
+    <div class="sheet-wrap" id="choice" hidden>
+      <div class="backdrop" data-close></div>
+      <div class="choice">
+        <p class="choice-title" id="choice-title"></p>
+        <div class="choice-opts" id="choice-opts"></div>
+        <button type="button" class="choice-cancel" data-close>취소</button>
+      </div>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite">
       <span class="toast-msg"></span>
@@ -111,6 +214,12 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/today.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

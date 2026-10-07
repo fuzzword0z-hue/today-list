@@ -1,11 +1,17 @@
 /* 오프라인 동작용 서비스 워커.
  * 캐시에 있는 파일로 바로 열고, 네트워크가 되면 뒤에서 새 버전을 받아 둔다(다음 실행 때 반영). */
-const CACHE = 'today-v1';
+const CACHE = 'today-v2';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './js/core.js',
+  './js/events.js',
+  './js/today.js',
+  './js/calendar.js',
+  './js/stats.js',
+  './js/report.js',
+  './js/main.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

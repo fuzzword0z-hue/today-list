@@ -23,8 +23,8 @@
 정적 파일만 있으므로 HTTPS로 올리기만 하면 됩니다. (서비스 워커는 HTTPS에서만 동작)
 
 ### 1) 웹에 올리기 — GitHub Pages
-1. 이 브랜치를 `main`에 병합합니다.
-2. 저장소 **Settings → Pages → Build and deployment**에서 Source: `Deploy from a branch`, Branch: `main` / `/ (root)` 선택 후 Save.
+1. 저장소 **Settings → Pages → Build and deployment**에서 Source: `Deploy from a branch` 선택
+2. Branch: 이 코드가 있는 브랜치(`main`으로 병합했다면 `main`) / `/ (root)` 선택 후 Save.
 3. 1–2분 뒤 `https://<GitHub 아이디>.github.io/today-list/` 주소가 생깁니다.
 
 > 비공개 저장소는 GitHub 유료 플랜에서만 Pages를 쓸 수 있습니다. 공개 저장소로 해도 **할 일 내용은 휴대폰 안에만 저장**되므로 코드 외에는 아무것도 공개되지 않습니다.

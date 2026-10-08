@@ -21,7 +21,7 @@ function level(s) {
 function range() {
   const a = parse(ui.anchor);
   if (ui.mode === 'week') {
-    const start = addDays(ui.anchor, -((a.getDay() + 6) % 7)); // 월요일 시작
+    const start = addDays(ui.anchor, -a.getDay()); // 일요일 시작 (캘린더와 같게)
     return { start, end: addDays(start, 6) };
   }
   if (ui.mode === 'month') {
@@ -147,8 +147,8 @@ function cellClass(k, base) {
 }
 
 function renderMonth(start, end) {
-  const lead = (parse(start).getDay() + 6) % 7;
-  let html = ['월', '화', '수', '목', '금', '토', '일'].map((w) => `<div class="cal-wd">${w}</div>`).join('');
+  const lead = parse(start).getDay();
+  let html = WD.map((w) => `<div class="cal-wd">${w}</div>`).join('');
   html += '<div class="cell blank"></div>'.repeat(lead);
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const s = dayStat(k);

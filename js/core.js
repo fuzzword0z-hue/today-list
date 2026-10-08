@@ -12,6 +12,7 @@
  *     until 반복 끝나는 날 · ex 반복 중 뺀 날짜들 · done { 'YYYY-MM-DD': ms } 케어 완료 기록
  *   dismissed: 'YYYY-MM-DD' | null,   '못 끝낸 일' 배너를 닫은 날
  *   seen: [ 'YYYY-MM' | 'YYYY' ],     열어 본 리포트
+ *   lastExport: ms | undefined,       마지막으로 백업 파일을 내보낸 시각
  * }
  */
 const STORE = 'today-list:v1';
@@ -22,10 +23,14 @@ let state = load();
 function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(STORE)); } catch (e) { /* 손상된 데이터는 무시 */ }
-  if (!s || !s.days) s = { days: {} };
+  return normalize(s && s.days && typeof s.days === 'object' ? s : { days: {} });
+}
+
+/* 예전 형식(v1)이나 백업 파일에서 읽은 데이터에 빠진 항목을 채운다 */
+function normalize(s) {
   s.v = 2;
-  s.events = s.events || [];
-  s.seen = s.seen || [];
+  s.events = Array.isArray(s.events) ? s.events : [];
+  s.seen = Array.isArray(s.seen) ? s.seen : [];
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }

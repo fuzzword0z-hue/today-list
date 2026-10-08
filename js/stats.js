@@ -108,6 +108,7 @@ function renderStats() {
     link.dataset.id = id;
     link.innerHTML = `<span>${reportName(id)}${ongoing ? ' <small>진행 중</small>' : ''}</span><span>보기 ›</span>`;
   }
+  renderBackup();
 }
 
 $('report-link').addEventListener('click', (e) => openReport(e.currentTarget.dataset.id));

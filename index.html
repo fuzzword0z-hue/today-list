@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <title>오늘</title>
 </head>
 <body>
@@ -125,6 +125,17 @@
         <div class="legend" id="legend"></div>
         <div class="detail" id="detail"></div>
         <button class="report-link" id="report-link" hidden></button>
+
+        <section class="backup" id="backup">
+          <h2 class="sub-head">백업</h2>
+          <p class="backup-text">기록은 이 휴대폰 안에만 있어요. 가끔 파일로 내보내 두면, 휴대폰을 바꾸거나 사이트 데이터를 지워도 그 파일로 되살릴 수 있어요.</p>
+          <p class="backup-last" id="backup-last"></p>
+          <div class="backup-actions">
+            <button class="backup-btn primary" id="export-btn">내보내기</button>
+            <button class="backup-btn" id="import-btn">불러오기</button>
+          </div>
+          <input type="file" id="import-file" hidden>
+        </section>
       </main>
     </section>
 
@@ -215,12 +226,13 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=5"></script>
-  <script src="js/events.js?v=5"></script>
-  <script src="js/today.js?v=5"></script>
-  <script src="js/calendar.js?v=5"></script>
-  <script src="js/stats.js?v=5"></script>
-  <script src="js/report.js?v=5"></script>
-  <script src="js/main.js?v=5"></script>
+  <script src="js/core.js?v=6"></script>
+  <script src="js/events.js?v=6"></script>
+  <script src="js/today.js?v=6"></script>
+  <script src="js/calendar.js?v=6"></script>
+  <script src="js/stats.js?v=6"></script>
+  <script src="js/report.js?v=6"></script>
+  <script src="js/backup.js?v=6"></script>
+  <script src="js/main.js?v=6"></script>
 </body>
 </html>

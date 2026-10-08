@@ -88,9 +88,9 @@ $('care').addEventListener('click', (e) => {
 
 /* ───────── 달력 ───────── */
 function renderMonthGrid(start, end) {
-  const lead = (parse(start).getDay() + 6) % 7; // 월요일 시작 (통계와 같게)
-  let html = ['월', '화', '수', '목', '금', '토', '일']
-    .map((w, i) => `<div class="mg-wd${i === 5 ? ' sat' : i === 6 ? ' sun' : ''}">${w}</div>`).join('');
+  const lead = parse(start).getDay(); // 일요일 시작 (통계와 같게)
+  let html = WD
+    .map((w, i) => `<div class="mg-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
   html += '<div class="mg-cell blank"></div>'.repeat(lead);
 
   let doseSeen = false;

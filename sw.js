@@ -6,7 +6,7 @@
  * 배포할 때: VERSION을 올리고, index.html의 ?v= 값도 같은 값으로 맞춘다.
  * 새 버전은 설치 단계에서 서버에서 직접(HTTP 캐시 무시) 전부 받아 두고,
  * 준비가 끝나면 열려 있는 앱을 한 번 새로 고쳐 새 버전으로 바꾼다. */
-const VERSION = '6';
+const VERSION = '7';
 const CACHE = `today-v${VERSION}`;
 const ASSETS = [
   './',
@@ -18,6 +18,7 @@ const ASSETS = [
   `./js/calendar.js?v=${VERSION}`,
   `./js/stats.js?v=${VERSION}`,
   `./js/report.js?v=${VERSION}`,
+  `./js/care.js?v=${VERSION}`,
   `./js/backup.js?v=${VERSION}`,
   `./js/main.js?v=${VERSION}`,
   './manifest.webmanifest',

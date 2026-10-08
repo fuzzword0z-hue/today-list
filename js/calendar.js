@@ -34,39 +34,51 @@ function renderCare(start, end) {
   }
 
   const rows = [];
-  // 반복 케어(투약): 오늘이면 바로 체크, 아니면 다음 날짜 + 이번 달 기록
-  for (const ev of care.filter((x) => x.rep && ((!x.until || x.until >= today) || overridesOf(x).some((o) => o.date >= today)))) {
-    // 이 날만 바꾼 회차도 같은 투약으로 센다
+  // 반복 투약: 오늘이면 바로 체크, 아니면 다음 날짜 + 이번 달 기록
+  for (const ev of care.filter((x) => isDose(x) && x.rep && ((!x.until || x.until >= today) || overridesOf(x).some((o) => o.date >= today)))) {
+    // 이 날만 바꾼 회차도 같은 투약으로 센다. 오늘 회차는 체크하기 전에는 세지 않는다
     const next = nextOfSeries(ev, today);
-    const past = seriesDays(ev, start, end < today ? end : today);
+    const past = seriesDays(ev, start, end < today ? end : today)
+      .filter((d) => d.k < today || isDone(d.ev, d.k) || isSkipped(d.ev, d.k));
     const sched = past.length;
     const given = past.filter((d) => isDone(d.ev, d.k)).length;
     const todayDose = next && next.k === today;
     const doneToday = todayDose && isDone(next.ev, today);
+    const skippedToday = todayDose && isSkipped(next.ev, today);
     const status = todayDose
-      ? (doneToday ? '<b class="ok">오늘 완료</b>' : '<b>오늘이에요</b>')
+      ? (doneToday ? '<b class="ok">오늘 완료</b>' : skippedToday ? '<b>오늘 못 먹임</b>' : '<b>오늘이에요</b>')
       : next ? `다음 ${relDay(next.k)} · ${mdw(next.k)}` : '일정 끝남';
     rows.push(`<li class="care-row" data-eid="${next ? next.ev.id : ev.id}" data-k="${next ? next.k : today}">
       <span class="care-ic">${PILL_SVG}</span>
       <span class="care-body"><span class="care-title">${esc(ev.title)} <small>${repLabel(ev.rep)}</small></span>
-        <span class="care-sub">${status}${sched ? ` · 이번 달 ${given}/${sched}회 기록` : ''}</span></span>
+        <span class="care-sub">${status}${sched ? ` · 이번 달 ${given}/${sched}회 먹임` : ''}</span></span>
       ${todayDose ? `<button class="ev-check" aria-pressed="${doneToday}" aria-label="오늘 ${esc(ev.title)} 완료">${CHECK_SVG}</button>` : ''}
     </li>`);
   }
-  // 반복 없는 케어(병원 진료 등): 가장 가까운 다음 일정
-  const visits = care
-    .filter((x) => !x.rep && !x.of && x.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
-  if (visits.length) {
-    const v = visits[0];
-    rows.push(`<li class="care-row" data-eid="${v.id}" data-k="${v.date}">
+
+  // 병원: 다음 진료 D-day, 없으면 지난 진료로부터 지난 기간 + 일정 추가
+  const next = nextVisit(today);
+  const last = lastVisit(today);
+  if (next) {
+    rows.push(`<li class="care-row" data-eid="${next.ev.id}" data-k="${next.k}">
       <span class="care-ic">${CROSS_SVG}</span>
-      <span class="care-body"><span class="care-title">${esc(v.title)}</span>
-        <span class="care-sub">${mdw(v.date)}${v.time ? ` ${v.time}` : ''}</span></span>
-      <span class="dday">${dday(v.date)}</span>
+      <span class="care-body"><span class="care-title">${esc(next.ev.title)}</span>
+        <span class="care-sub">${mdw(next.k)}${next.ev.time ? ` ${next.ev.time}` : ''}${next.ev.memo ? ` · ${esc(next.ev.memo)}` : ''}</span></span>
+      <span class="dday">${dday(next.k)}</span>
+    </li>`);
+  } else {
+    const ago = last ? diffDays(today, last.k) : null;
+    rows.push(`<li class="care-row vet-none">
+      <span class="care-ic">${CROSS_SVG}</span>
+      <span class="care-body"><span class="care-title">병원 진료</span>
+        <span class="care-sub">다음 일정이 아직 없어요${last ? ` · 지난 진료 ${md(last.k)} (${agoText(ago)})` : ''}</span></span>
+      <button class="care-btn" data-act="add-visit">+ 일정</button>
     </li>`);
   }
-  el.innerHTML = rows.length ? `<ul class="care-list">${rows.join('')}</ul>` : '';
+  if (last || Object.keys(state.cond).length) {
+    rows.push(`<li class="care-link"><button data-act="summary">${PAW_SVG}<span>진료 전 요약 보기</span><span class="care-link-go">›</span></button></li>`);
+  }
+  el.innerHTML = `<ul class="care-list">${rows.join('')}</ul>`;
 }
 
 $('care').addEventListener('click', (e) => {
@@ -75,12 +87,18 @@ $('care').addEventListener('click', (e) => {
     openSheet({
       k: today,
       preset: preset.dataset.preset === 'dose'
-        ? { title: '항암제', cat: 'care', rep: { t: 'd', n: 2 } }
-        : { title: '병원 진료', cat: 'care' },
+        ? { title: '항암제', cat: 'care', ck: 'dose', rep: { t: 'd', n: 2 } }
+        : { title: '병원 진료', cat: 'care', ck: 'vet' },
     });
     return;
   }
-  const li = e.target.closest('.care-row');
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    if (act.dataset.act === 'summary') openCareSummary();
+    else openSheet({ k: ui.calSel && ui.calSel >= today ? ui.calSel : today, preset: { title: '병원 진료', cat: 'care', ck: 'vet' } });
+    return;
+  }
+  const li = e.target.closest('.care-row[data-eid]');
   if (!li) return;
   if (e.target.closest('.ev-check')) toggleEventDone(li.dataset.eid, today);
   else openSheet({ id: li.dataset.eid, k: li.dataset.k });
@@ -93,7 +111,7 @@ function renderMonthGrid(start, end) {
     .map((w, i) => `<div class="mg-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
   html += '<div class="mg-cell blank"></div>'.repeat(lead);
 
-  let doseSeen = false;
+  let doseSeen = false, skipSeen = false, symSeen = false;
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const evs = eventsOn(k);
     // 반복 케어(투약)는 칸을 차지하지 않게 날짜 옆 작은 알약 표시로만 보여 준다
@@ -102,10 +120,15 @@ function renderMonthGrid(start, end) {
     let dose = '';
     if (doses.length) {
       doseSeen = true;
-      const all = doses.every((ev) => isDone(ev, k));
-      const st = all ? 'given' : k < today ? 'missed' : 'planned';
+      const st = doses.every((ev) => isDone(ev, k)) ? 'given'
+        : doses.some((ev) => !isDone(ev, k) && !isSkipped(ev, k)) ? (k < today ? 'missed' : 'planned')
+        : 'skipped';
+      if (st === 'skipped') skipSeen = true;
       dose = `<i class="dose ${st}"></i>`;
     }
+    // 고양이 컨디션에 이상(식욕 저하·구토·설사 등)이 기록된 날
+    const sym = hasSymptom(condOf(k));
+    if (sym) symSeen = true;
     const s = (state.days[k] || []);
     const tasks = s.length ? `<span class="mg-tasks">${s.filter((t) => t.d).length}/${s.length}</span>` : '';
     const wd = parse(k).getDay();
@@ -115,7 +138,7 @@ function renderMonthGrid(start, end) {
     if (wd === 0) cls.push('sun');
     if (wd === 6) cls.push('sat');
     html += `<button class="${cls.join(' ')}" data-k="${k}" aria-label="${mdw(k)} 일정 ${evs.length}개">
-      <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}</span>
+      <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}${sym ? '<i class="sym"></i>' : ''}</span>
       ${shown.slice(0, 2).map((ev) => `<span class="mg-ev cat-${ev.cat}">${esc(ev.title)}</span>`).join('')}
       ${shown.length > 2 ? `<span class="mg-more">+${shown.length - 2}</span>` : ''}
       ${tasks}
@@ -126,6 +149,8 @@ function renderMonthGrid(start, end) {
   $('cal-legend').innerHTML = [
     ...Object.entries(CATS).map(([c, v]) => `<span><i class="sw cat-${c}"></i>${v.label}</span>`),
     doseSeen ? '<span><i class="dose given"></i>투약 완료</span><span><i class="dose planned"></i>예정</span><span><i class="dose missed"></i>기록 없음</span>' : '',
+    skipSeen ? '<span><i class="dose skipped"></i>못 먹임</span>' : '',
+    symSeen ? '<span><i class="sym"></i>컨디션 이상</span>' : '',
     '<span class="mg-tasks-key">3/5 할 일</span>',
   ].join('');
 }
@@ -151,6 +176,7 @@ function renderDayPanel() {
       <button class="dp-add" id="dp-add">+ 일정</button>
     </div>
     ${evs.length ? `<ul class="ev-list">${evs.map((ev) => eventRow(ev, k)).join('')}</ul>` : '<p class="dp-empty">일정이 없어요</p>'}
+    ${condOf(k) ? `<button class="dp-cond" id="dp-cond"><span class="dp-cond-ic">${PAW_SVG}</span><span class="${hasSymptom(condOf(k)) ? 'bad' : ''}">${esc(condSummary(condOf(k)))}</span><span>›</span></button>` : ''}
     <button class="dp-tasks" id="dp-tasks">
       <span>할 일 ${items.length ? `${done}/${items.length} 완료` : '없음'}</span><span>할 일 보기 ›</span>
     </button>`;
@@ -159,6 +185,7 @@ function renderDayPanel() {
 $('day-panel').addEventListener('click', (e) => {
   if (e.target.closest('#dp-add')) openSheet({ k: ui.calSel });
   else if (e.target.closest('#dp-tasks')) goDate(ui.calSel);
+  else if (e.target.closest('#dp-cond')) { condOpenFor = ui.calSel; goDate(ui.calSel); }
 });
 bindEventList($('day-panel'));
 
@@ -166,7 +193,7 @@ bindEventList($('day-panel'));
 function renderUpcoming() {
   const limit = addDays(today, UPCOMING_DAYS);
   const list = state.events
-    .filter((ev) => !ev.rep && !ev.of && ev.date >= today && ev.date <= limit)
+    .filter((ev) => !ev.rep && !ev.of && !isDose(ev) && ev.date >= today && ev.date <= limit)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     .slice(0, 6);
   $('upcoming').innerHTML = list.length

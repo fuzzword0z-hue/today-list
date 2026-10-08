@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
   <title>오늘</title>
 </head>
 <body>
@@ -44,6 +44,7 @@
 
       <main class="scroll" id="today-scroll">
         <div id="report-banners"></div>
+        <div id="care-prompts"></div>
         <div class="banner" id="carry" hidden>
           <span class="banner-text" id="carry-text"></span>
           <button class="banner-act" id="carry-yes">오늘로 가져오기</button>
@@ -52,6 +53,7 @@
           </button>
         </div>
         <ul class="ev-list" id="today-events"></ul>
+        <div class="cond" id="cond" hidden></div>
         <ul class="list" id="list"></ul>
         <div class="empty" id="empty" hidden>
           <p class="empty-title">할 일을 적어 보세요</p>
@@ -179,13 +181,19 @@
           <h2 id="sheet-title">일정 추가</h2>
           <button type="submit" class="sheet-btn strong">저장</button>
         </div>
+        <div class="sheet-record" id="sheet-record" hidden></div>
         <input class="ev-title-input" id="ev-title" type="text" maxlength="100" placeholder="일정 이름 (예: 면접, 병원 진료)" required>
         <div class="cat-pick" id="cat-pick" role="radiogroup" aria-label="분류">
           <button type="button" role="radio" data-cat="work"><i></i>공적</button>
           <button type="button" role="radio" data-cat="life"><i></i>사적</button>
           <button type="button" role="radio" data-cat="care"><i></i>케어</button>
         </div>
+        <div class="care-kind" id="care-kind" role="radiogroup" aria-label="케어 종류" hidden>
+          <button type="button" role="radio" data-kind="dose">투약·처치</button>
+          <button type="button" role="radio" data-kind="vet">병원</button>
+        </div>
         <p class="cat-hint" id="cat-hint"></p>
+        <div class="vet-hint" id="vet-hint" hidden></div>
         <div class="fields">
           <label class="field"><span>날짜</span><input type="date" id="ev-date" required></label>
           <label class="field"><span>시간</span>
@@ -226,13 +234,14 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=6"></script>
-  <script src="js/events.js?v=6"></script>
-  <script src="js/today.js?v=6"></script>
-  <script src="js/calendar.js?v=6"></script>
-  <script src="js/stats.js?v=6"></script>
-  <script src="js/report.js?v=6"></script>
-  <script src="js/backup.js?v=6"></script>
-  <script src="js/main.js?v=6"></script>
+  <script src="js/core.js?v=7"></script>
+  <script src="js/events.js?v=7"></script>
+  <script src="js/today.js?v=7"></script>
+  <script src="js/calendar.js?v=7"></script>
+  <script src="js/stats.js?v=7"></script>
+  <script src="js/report.js?v=7"></script>
+  <script src="js/care.js?v=7"></script>
+  <script src="js/backup.js?v=7"></script>
+  <script src="js/main.js?v=7"></script>
 </body>
 </html>

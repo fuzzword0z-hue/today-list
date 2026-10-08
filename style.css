@@ -840,3 +840,105 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .backup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .backup-btn { height: 44px; border-radius: 12px; background: var(--bg); font-size: 15px; font-weight: 600; }
 .backup-btn.primary { background: var(--accent); color: var(--on-accent); }
+
+/* ═════════════════ 케어: 종류 · 기록 · 컨디션 · 진료 전 요약 ═════════════════ */
+
+/* 시트: 케어 종류, 병원 날짜 도움, 그 날 기록 */
+.care-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.care-kind button {
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.care-kind button[aria-checked="true"] { border-color: var(--c-care); background: var(--c-care-soft); color: var(--text); }
+.vet-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 4px 0; font-size: 13px; color: var(--text-2); }
+.vet-hint button { padding: 6px 10px; border-radius: 999px; background: var(--c-care-soft); color: var(--text); font-size: 13px; font-weight: 600; }
+.sheet-record { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: var(--c-care-soft); }
+.sr-label { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.sr-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sr-opts button { height: 36px; border-radius: 9px; background: var(--surface); font-size: 14px; font-weight: 600; color: var(--text-2); }
+.sr-opts button[aria-pressed="true"] { background: var(--c-care); color: #fff; }
+
+/* 일정 줄: 못 먹임·안 감 */
+.ev.skipped .ev-title { color: var(--text-2); }
+.ev-meta em.muted { color: var(--text-2); }
+
+/* 달력: 못 먹임 알약, 컨디션 이상 점 */
+.dose.skipped { background: var(--track); border-color: var(--text-3); }
+.sym { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+
+/* 오늘 화면: 체크 누락 확인 */
+.care-prompt { padding: 8px 8px 8px 14px; background: var(--c-care-soft); }
+.care-prompt .banner-text b { font-weight: 700; }
+.cp-btn { flex: none; padding: 8px 10px; border-radius: 9px; background: var(--surface); font-size: 13px; font-weight: 600; color: var(--text-2); }
+.cp-btn.yes { background: var(--c-care); color: #fff; }
+
+/* 오늘 화면: 고양이 컨디션 카드 */
+.cond { margin: 8px 0 4px; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+.cond-head { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 12px; text-align: left; }
+.cond-ic, .dp-cond-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--c-care-soft); color: var(--c-care); }
+.cond-ic svg, .dp-cond-ic svg, .care-link svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+.cond-title { flex: none; font-size: 15px; font-weight: 600; }
+.cond-sum { flex: 1; min-width: 0; font-size: 13px; color: var(--text-2); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cond-sum.bad, .dp-cond .bad { color: var(--danger); font-weight: 600; }
+.cond-chev { flex: none; width: 18px; height: 18px; color: var(--text-3); transition: transform .2s ease; }
+.cond-head[aria-expanded="true"] .cond-chev { transform: rotate(180deg); }
+.cond-body { padding: 0 12px 12px; border-top: 1px solid var(--line); }
+.cond-row { display: flex; align-items: center; gap: 8px; padding-top: 10px; }
+.cond-label { flex: none; width: 34px; font-size: 13px; color: var(--text-2); }
+.chips { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.chips button[aria-pressed="true"] { background: var(--c-care); border-color: var(--c-care); color: #fff; font-weight: 600; }
+.chips button.bad[aria-pressed="true"] { background: var(--danger); border-color: var(--danger); }
+.cond-w {
+  width: 84px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  text-align: right;
+}
+.cond-unit { font-size: 14px; color: var(--text-2); }
+.cond-prev { margin-left: auto; font-size: 12px; color: var(--text-3); }
+.cond-memo {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: none;
+}
+.cond-help { margin: 8px 2px 0; font-size: 12px; color: var(--text-3); }
+
+/* 캘린더 케어 카드: 병원 일정 없음, 진료 전 요약 링크 */
+.care-btn { flex: none; padding: 8px 12px; border-radius: 999px; background: var(--surface); font-size: 13px; font-weight: 700; color: var(--text); }
+.care-link { border-top: 1px solid color-mix(in srgb, var(--c-care) 20%, transparent); }
+.care-link button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 14px; font-size: 14px; font-weight: 600; color: var(--text); text-align: left; }
+.care-link svg { color: var(--c-care); }
+.care-link-go { margin-left: auto; color: var(--text-2); }
+
+/* 캘린더 선택한 날: 컨디션 한 줄 */
+.dp-cond { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 6px; padding: 8px 2px; font-size: 14px; color: var(--text-2); text-align: left; }
+.dp-cond span:nth-child(2) { flex: 1; min-width: 0; }
+
+/* 진료 전 요약 */
+.r-sec.cs li::before { content: "•"; background: var(--c-care-soft); color: var(--c-care); }

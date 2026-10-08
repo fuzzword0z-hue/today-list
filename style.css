@@ -753,7 +753,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .sheet-alt { width: 100%; height: 48px; margin-top: 12px; border-radius: 12px; background: var(--surface); color: var(--accent); font-weight: 600; }
 .sheet-del { width: 100%; height: 48px; margin-top: 12px; border-radius: 12px; background: var(--surface); color: var(--danger); font-weight: 600; }
 .choice { padding-top: 16px; }
-.choice-title { margin: 0 4px 12px; font-size: 14px; color: var(--text-2); text-align: center; }
+.choice-title { margin: 0 4px 12px; font-size: 14px; line-height: 1.5; color: var(--text-2); text-align: center; }
 .choice-opts { display: flex; flex-direction: column; gap: 8px; }
 .choice-opts button, .choice-cancel { height: 50px; border-radius: 12px; background: var(--surface); font-size: 16px; font-weight: 600; }
 .choice-opts button.danger { color: var(--danger); }
@@ -829,3 +829,14 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .r-mbar { width: 100%; max-width: 18px; height: 90px; display: flex; flex-direction: column-reverse; border-bottom: 1px solid var(--line); }
 .r-mbar i { display: block; width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; }
 .r-mlab { font-size: 11px; color: var(--text-2); }
+
+/* ───────── 백업 ───────── */
+.backup { margin-top: 28px; padding: 16px; background: var(--surface); border-radius: var(--radius); }
+.backup .sub-head { margin: 0 0 6px; }
+.backup-text { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-2); }
+.backup-last { margin: 10px 0 0; font-size: 13px; color: var(--text-2); }
+.backup-last:empty { display: none; }
+.backup-last.warn { color: var(--danger); font-weight: 600; }
+.backup-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.backup-btn { height: 44px; border-radius: 12px; background: var(--bg); font-size: 15px; font-weight: 600; }
+.backup-btn.primary { background: var(--accent); color: var(--on-accent); }

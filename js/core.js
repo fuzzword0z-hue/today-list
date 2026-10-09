@@ -13,6 +13,8 @@
  *   dismissed: 'YYYY-MM-DD' | null,   '못 끝낸 일' 배너를 닫은 날
  *   seen: [ 'YYYY-MM' | 'YYYY' ],     열어 본 리포트
  *   lastExport: ms | undefined,       마지막으로 백업 파일을 내보낸 시각
+ *   cond: { 'YYYY-MM-DD': { ap, en, vo, st, w, n } }   고양이 컨디션 (js/care.js)
+ * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 먹임·안 감)이 더 붙는다.
  * }
  */
 const STORE = 'today-list:v1';
@@ -31,6 +33,7 @@ function normalize(s) {
   s.v = 2;
   s.events = Array.isArray(s.events) ? s.events : [];
   s.seen = Array.isArray(s.seen) ? s.seen : [];
+  s.cond = s.cond && typeof s.cond === 'object' && !Array.isArray(s.cond) ? s.cond : {};
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }
@@ -123,7 +126,8 @@ function render() {
   app.dataset.view = r.view;
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== r.view;
   for (const b of $('tabs').children) {
-    const on = b.dataset.tab === r.view || (r.view === 'report' && b.dataset.tab === 'stats');
+    // 리포트는 통계 탭, 진료 전 요약은 캘린더 탭에 속한다
+    const on = b.dataset.tab === r.view || (r.view === 'report' && b.dataset.tab === (r.id === 'care' ? 'cal' : 'stats'));
     b.classList.toggle('on', on);
     b.setAttribute('aria-current', on ? 'page' : 'false');
   }

@@ -31,20 +31,24 @@ function renderToday() {
     : `${done} / ${total}${moved ? ` · 미룸 ${moved}` : ''}`;
 
   renderReportBanners();
+  renderCarePrompts();
   renderCarry();
 
   // 그날 일정 (케어 일정은 여기서 바로 체크)
   const evs = eventsOn(k);
   $('today-events').innerHTML = evs.length
-    ? `<li class="section-head">일정 ${evs.length}</li>${evs.map((ev) => eventRow(ev, k)).join('')}<li class="section-head">할 일</li>`
+    ? `<li class="section-head">일정 ${evs.length}</li>${evs.map((ev) => eventRow(ev, k)).join('')}`
     : '';
+  renderCond();
 
   // 목록: 할 일 → 완료(완료한 순서) → 미룸
   const active = items.filter((t) => !t.d && !t.m);
   const doneList = items.filter((t) => t.d).sort((a, b) => (a.at || 0) - (b.at || 0));
   const movedList = items.filter((t) => t.m);
 
-  let html = active.map(row).join('');
+  // 일정이나 컨디션 카드가 위에 있으면 '할 일' 제목으로 구분
+  let html = (evs.length || !$('cond').hidden) && items.length ? '<li class="section-head">할 일</li>' : '';
+  html += active.map(row).join('');
   if (doneList.length) html += `<li class="section-head">완료 ${doneList.length}</li>` + doneList.map(row).join('');
   if (movedList.length) html += `<li class="section-head">미룸 ${movedList.length}</li>` + movedList.map(row).join('');
   $('list').innerHTML = html;

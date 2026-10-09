@@ -26,7 +26,9 @@ function prevId(id) {
 
 function hasData({ start, end }) {
   for (const k in state.days) if (k >= start && k <= end) return true;
-  return state.events.some((ev) => ev.done && Object.keys(ev.done).some((k) => k >= start && k <= end));
+  for (const k in state.cond) if (k >= start && k <= end) return true;
+  const inRange = (o) => o && Object.keys(o).some((k) => k >= start && k <= end);
+  return state.events.some((ev) => inRange(ev.done) || inRange(ev.skip));
 }
 
 function dueReports() {
@@ -118,19 +120,36 @@ function analyze(id) {
 
   // 케어: 반복(투약)은 예정 대비 기록, 반복 없는 케어(진료)는 다녀온 횟수
   // (이 날만 바꾼 회차는 원래 반복 일정의 투약으로 센다)
-  m.care = state.events.filter((ev) => checkable(ev) && ev.rep).map((ev) => {
-    const c = { ev, sched: 0, given: 0, missed: [] };
+  // ('못 먹임'으로 남긴 날은 기록한 것으로, 체크가 아예 없는 날만 '기록 없음'으로 센다)
+  m.care = state.events.filter((ev) => isDose(ev) && ev.rep).map((ev) => {
+    const c = { ev, sched: 0, given: 0, skipped: [], missed: [] };
     for (const d of seriesDays(ev, start, last)) {
       c.sched++;
-      if (isDone(d.ev, d.k)) c.given++; else c.missed.push(d.k);
+      if (isDone(d.ev, d.k)) c.given++;
+      else if (isSkipped(d.ev, d.k)) c.skipped.push(d.k);
+      else c.missed.push(d.k);
     }
+    c.recorded = c.given + c.skipped.length;
     return c;
   }).filter((c) => c.sched > 0);
   m.careSched = m.care.reduce((a, c) => a + c.sched, 0);
   m.careGiven = m.care.reduce((a, c) => a + c.given, 0);
-  m.visits = state.events
-    .filter((ev) => checkable(ev) && !ev.rep && !ev.of && ev.date >= start && ev.date <= last)
-    .map((ev) => ({ ev, done: isDone(ev, ev.date) }));
+  m.careRecorded = m.care.reduce((a, c) => a + c.recorded, 0);
+  m.visits = vetDays(start, last)
+    .filter((d) => !isSkipped(d.ev, d.k))
+    .map((d) => ({ ev: d.ev, k: d.k, done: isDone(d.ev, d.k) }));
+
+  // 고양이 컨디션
+  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [] };
+  for (let k = start; k <= last; k = addDays(k, 1)) {
+    const c = condOf(k);
+    if (!c) continue;
+    cd.days++;
+    if (hasSymptom(c)) cd.sym++;
+    if (c.vo && c.vo !== '0') { cd.vomitDays++; cd.vomit += +c.vo; }
+    if (c.w) cd.w.push({ k, w: c.w });
+  }
+  m.cond = cd;
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
@@ -151,7 +170,7 @@ function score(m) {
     parts.push({ label: '꾸준함 (기록한 날)', v: m.active / m.days, w: 0.25 });
     parts.push({ label: '미루지 않기', v: Math.max(0, 1 - (m.moved / m.total) * 2), w: 0.15 });
   }
-  if (m.careSched) parts.push({ label: '케어 기록', v: m.careGiven / m.careSched, w: 0.2 });
+  if (m.careSched) parts.push({ label: '케어 기록', v: m.careRecorded / m.careSched, w: 0.2 });
   if (!parts.length) return null;
   const sw = parts.reduce((a, p) => a + p.w, 0);
   const total = Math.round((parts.reduce((a, p) => a + p.v * p.w, 0) / sw) * 100);
@@ -193,8 +212,9 @@ function feedback(m, p) {
   if (m.streakBest >= 7) good.push(`${m.streakBest}일 연속으로 할 일을 끝낸 기간이 있었어요.`);
   if (m.perfect >= (Y ? 30 : 5)) good.push(`적은 일을 전부 끝낸 날이 ${m.perfect}일이에요.`);
   for (const c of care) {
-    if (c.sched >= 3 && c.given / c.sched >= 0.95) good.push(`${c.ev.title} ${c.sched}번 중 ${c.given}번을 기록했어요. 빠짐없이 챙기고 있어요.`);
+    if (c.sched >= 3 && c.recorded / c.sched >= 0.95) good.push(`${c.ev.title} ${c.sched}번 중 ${c.recorded}번을 기록했어요. 빠짐없이 챙기고 있어요.`);
   }
+  if (m.cond.days >= (Y ? 100 : 10)) good.push(`고양이 컨디션을 ${m.cond.days}일 기록했어요. 진료 때 큰 도움이 돼요.`);
   const visited = m.visits.filter((v) => v.done);
   if (visited.length) good.push(`${[...new Set(visited.map((v) => v.ev.title))].join(', ')} ${visited.length}번을 잘 다녀왔어요.`);
   if (m.total >= 10 && m.moved / m.total <= 0.1) good.push(`미룬 일이 ${m.moved}개(${pct(m.moved / m.total)}%)뿐이에요. 정한 날에 해내는 힘이 좋아요.`);
@@ -252,7 +272,7 @@ function feedback(m, p) {
     goals.push(`${c.ev.title} 체크 100%`);
   }
   if (m.open >= 5) fix.push(`끝내지도, 미루지도 않고 남은 일이 ${m.open}개예요. 하루를 마칠 때 남은 일은 '내일로' 넘기거나 지워서 정리해 주세요.`);
-  if (m.gap.len >= 4) fix.push(`${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 바쁜 날엔 한 줄이라도 남겨 보세요.`);
+  if (m.active && m.gap.len >= 4) fix.push(`${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 바쁜 날엔 한 줄이라도 남겨 보세요.`);
   if (r !== null && m.total >= 10 && r < 0.5) fix.push(`완료율이 ${pct(r)}%로 절반에 못 미쳐요. 할 일 수를 줄이는 것부터 시작해 보세요.`);
   if (!fix.length) fix.push('특별히 고칠 점이 보이지 않아요. 지금처럼만 해 주세요.');
 
@@ -286,13 +306,14 @@ function cheer(m, s, W, prev) {
 let lastReportText = '';
 
 function renderReport(id) {
+  if (id === 'care') { renderCareSummary(); return; }
   if (!/^\d{4}(-\d{2})?$/.test(id)) { go('stats'); return; }
   $('report-title').textContent = reportName(id);
   const m = analyze(id);
   const el = $('report');
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
-  if (m.last < m.start || (!m.total && !m.careSched)) {
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -318,8 +339,15 @@ function renderReport(id) {
     tiles.push(['최장 연속', `${m.streakBest}<small>일</small>`, '']);
     tiles.push(['미룬 일', `${m.moved}<small>개</small>`, '']);
   }
-  for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, '']);
+  for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, c.skipped.length ? `<small>못 먹임 ${c.skipped.length}회</small>` : '']);
   if (m.visits.length) tiles.push(['진료', `${m.visits.filter((v) => v.done).length}<small>회</small>`, '']);
+  if (m.cond.days) tiles.push(['컨디션 기록', `${m.cond.days}<small>일</small>`, m.cond.sym ? `<small>이상 ${m.cond.sym}일</small>` : '']);
+  if (m.cond.vomit) tiles.push(['구토', `${m.cond.vomit}<small>회${m.cond.vomit > m.cond.vomitDays ? '+' : ''}</small>`, `<small>${m.cond.vomitDays}일</small>`]);
+  if (m.cond.w.length >= 2) {
+    const a = m.cond.w[0].w, b = m.cond.w[m.cond.w.length - 1].w;
+    const d = Math.round((b - a) * 100) / 100;
+    tiles.push(['체중', `${b}<small>kg</small>`, `<small>${d > 0 ? '+' : ''}${d}kg (${a}→${b})</small>`]);
+  }
   const ev = m.evCount;
   if (ev.work + ev.life + ev.care) tiles.push(['일정', `${ev.work + ev.life + ev.care}<small>개</small>`, `<small>공적 ${ev.work} · 사적 ${ev.life}${ev.care ? ` · 케어 ${ev.care}` : ''}</small>`]);
 

@@ -7,6 +7,11 @@ const CATS = {
   life: { label: '사적', hint: '친구·가족 모임, 약속처럼 사적인 일정' },
   care: { label: '케어', hint: '투약·병원 진료 — 날마다 체크해서 기록해요' },
 };
+/* 케어 종류: 투약·처치(집에서 하는 약·수액 등) / 병원(진료·검사) */
+const CARE_KINDS = {
+  dose: { label: '투약·처치', short: '투약', hint: '집에서 하는 투약·처치 — 반복으로 등록하면 날마다 체크해요', yes: '먹였어요', no: '못 먹였어요', noShort: '못 먹임' },
+  vet: { label: '병원', short: '병원', hint: '병원 진료·검사 — 다녀오면 체크해요. 진료 전 요약에 쓰여요', yes: '다녀왔어요', no: '안 갔어요', noShort: '안 감' },
+};
 const REP_LABEL = { d1: '매일', d2: '이틀마다', d3: '3일마다', w1: '매주', w2: '2주마다', m1: '매달' };
 const repKey = (r) => (r ? `${r.t}${r.n}` : '');
 const repLabel = (r) => (r ? REP_LABEL[repKey(r)] || `${r.n}${r.t === 'd' ? '일' : r.t === 'w' ? '주' : '달'}마다` : '');
@@ -21,8 +26,11 @@ const checkable = (ev) => ev.cat === 'care';
  * 반복 쪽에서는 그 날짜가 ex로 빠지고, 이 일정이 대신 그 회차를 맡는다. */
 const seriesOf = (ev) => (ev.of ? state.events.find((x) => x.id === ev.of && x.rep) : null);
 const overridesOf = (series) => state.events.filter((x) => x.of === series.id);
-/* 투약처럼 반복되는 케어 회차 (반복 일정 자체 + 이 날만 바꾼 회차) — 달력에선 알약 표시, 리포트에선 투약 기록 */
-const isDose = (ev) => checkable(ev) && !!(ev.rep || ev.of);
+/* 케어 종류. ck가 없는 예전 일정은 반복(또는 이 날만 바꾼 회차)이면 투약, 아니면 병원으로 본다 */
+const careKind = (ev) => (checkable(ev) ? ev.ck || (ev.rep || ev.of ? 'dose' : 'vet') : null);
+/* 투약 회차 — 달력에선 알약 표시, 리포트에선 투약 기록 */
+const isDose = (ev) => careKind(ev) === 'dose';
+const isVet = (ev) => careKind(ev) === 'vet';
 
 /* 반복 일정의 from–to 사이 회차들 (이 날만 바꾼 회차 포함): [{ ev, k }] */
 function seriesDays(series, from, to) {
@@ -73,17 +81,31 @@ function nextOccurrence(ev, from) {
   return null;
 }
 
+/* 케어 기록은 세 가지: 했음(done) · 못 했음(skip, 예: 못 먹임·안 감) · 기록 없음(둘 다 없음) */
 const isDone = (ev, k) => !!(ev.done && ev.done[k]);
+const isSkipped = (ev, k) => !!(ev.skip && ev.skip[k]);
+
+function setCareRecord(ev, k, rec) { // rec: 'done' | 'skip' | null
+  for (const f of ['done', 'skip']) {
+    if (ev[f]) { delete ev[f][k]; if (!Object.keys(ev[f]).length) delete ev[f]; }
+  }
+  if (rec) ev[rec] = { ...(ev[rec] || {}), [k]: Date.now() };
+}
+
+/* 기록(했음·못 했음)을 다른 일정·날짜로 옮긴다 ('이 날만 바꾸기', 되돌리기) */
+function moveRecord(from, fk, to, tk) {
+  const rec = isDone(from, fk) ? 'done' : isSkipped(from, fk) ? 'skip' : null;
+  if (!rec) return;
+  setCareRecord(from, fk, null);
+  setCareRecord(to, tk, rec);
+}
 
 function toggleEventDone(id, k) {
   const ev = state.events.find((x) => x.id === id);
   if (!ev) return;
-  ev.done = ev.done || {};
-  if (ev.done[k]) delete ev.done[k];
-  else {
-    ev.done[k] = Date.now();
-    if (navigator.vibrate) navigator.vibrate(8);
-  }
+  const was = isDone(ev, k);
+  setCareRecord(ev, k, was ? null : 'done');
+  if (!was && navigator.vibrate) navigator.vibrate(8);
   save();
   render();
 }
@@ -91,14 +113,16 @@ function toggleEventDone(id, k) {
 /* 오늘 화면·캘린더에서 같이 쓰는 일정 한 줄 */
 function eventRow(ev, k) {
   const done = isDone(ev, k);
+  const kind = careKind(ev);
+  const skipped = kind && !done && isSkipped(ev, k);
   const changed = ev.of ? (ev.ok && ev.ok !== ev.date ? `이 날만 변경 (원래 ${md(ev.ok)})` : '이 날만 변경') : '';
-  const meta = [CATS[ev.cat].label, repLabel(ev.rep), changed].filter(Boolean).join(' · ');
-  const late = checkable(ev) && !done && k < today;
-  return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}" data-eid="${ev.id}" data-k="${k}">
+  const meta = [CATS[ev.cat].label + (kind ? ` · ${CARE_KINDS[kind].short}` : ''), repLabel(ev.rep), changed].filter(Boolean).join(' · ');
+  const late = kind && !done && !skipped && k < today;
+  return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}${skipped ? ' skipped' : ''}" data-eid="${ev.id}" data-k="${k}">
     <span class="ev-time">${ev.time || '종일'}</span>
     <span class="ev-body">
       <span class="ev-title">${esc(ev.title)}</span>
-      <span class="ev-meta">${meta}${late ? ' · <em>기록 없음</em>' : ''}${ev.memo ? ` · ${esc(ev.memo)}` : ''}</span>
+      <span class="ev-meta">${meta}${late ? ' · <em>기록 없음</em>' : ''}${skipped ? ` · <em class="muted">${CARE_KINDS[kind].noShort}</em>` : ''}${ev.memo ? ` · ${esc(ev.memo)}` : ''}</span>
     </span>
     ${checkable(ev) ? `<button class="ev-check" aria-pressed="${done}" aria-label="${esc(ev.title)} ${done ? '완료 취소' : '완료'}">${CHECK_SVG}</button>` : ''}
   </li>`;
@@ -117,11 +141,51 @@ function bindEventList(el) {
 /* ───────── 추가 / 수정 시트 ───────── */
 let sheetCtx = null; // { id?, k }
 let sheetCat = 'work';
+let sheetKind = 'vet';
 
 function setCat(cat) {
   sheetCat = cat;
   for (const b of $('cat-pick').children) b.setAttribute('aria-checked', String(b.dataset.cat === cat));
-  $('cat-hint').textContent = CATS[cat].hint;
+  $('care-kind').hidden = cat !== 'care';
+  if (cat === 'care') setKind(sheetKind);
+  else { $('cat-hint').textContent = CATS[cat].hint; $('vet-hint').hidden = true; }
+  renderSheetRecord();
+}
+
+function setKind(kind) {
+  sheetKind = kind;
+  for (const b of $('care-kind').children) b.setAttribute('aria-checked', String(b.dataset.kind === kind));
+  $('cat-hint').textContent = CARE_KINDS[kind].hint;
+  renderVetHint();
+  renderSheetRecord();
+}
+
+/* 병원 일정: 지난 진료일에서 4주·5주 뒤 날짜를 눌러 바로 채울 수 있게 (날짜는 직접 골라도 된다) */
+function renderVetHint() {
+  const el = $('vet-hint');
+  const last = sheetCat === 'care' && sheetKind === 'vet' ? lastVisit(sheetCtx && sheetCtx.id ? sheetCtx.k : addDays(today, 1)) : null;
+  el.hidden = !last;
+  if (!last) return;
+  const w4 = addDays(last.k, 28);
+  const w5 = addDays(last.k, 35);
+  el.innerHTML = `<span>지난 진료 ${md(last.k)}</span>
+    <button type="button" data-d="${w4}">4주 후 ${md(w4)}</button>
+    <button type="button" data-d="${w5}">5주 후 ${md(w5)}</button>`;
+}
+
+/* 수정할 때: 그 날의 케어 기록(했음 / 못 했음 / 기록 없음)을 바로 바꾼다 */
+function renderSheetRecord() {
+  const el = $('sheet-record');
+  const ev = sheetCtx && sheetCtx.id ? state.events.find((x) => x.id === sheetCtx.id) : null;
+  const kind = ev && careKind(ev);
+  el.hidden = !kind || sheetCat !== 'care';
+  if (el.hidden) return;
+  const k = sheetCtx.k;
+  const cur = isDone(ev, k) ? 'done' : isSkipped(ev, k) ? 'skip' : '';
+  const K = CARE_KINDS[kind];
+  el.innerHTML = `<span class="sr-label">${md(k)} 기록</span>
+    <div class="sr-opts">${[['done', K.yes], ['skip', K.no], ['', '기록 없음']]
+      .map(([v, l]) => `<button type="button" data-rec="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
 }
 
 /* preset: 새 일정 기본값 (예: 캘린더의 '투약 일정 추가') */
@@ -131,13 +195,14 @@ function openSheet({ id = null, k = ui.calSel || today, preset = null } = {}) {
   const src = ev || preset || {};
   $('sheet-title').textContent = ev ? '일정 수정' : '일정 추가';
   $('ev-title').value = src.title || '';
-  setCat(src.cat || 'work');
+  sheetKind = careKind(src.cat === 'care' ? src : {}) || 'vet';
   $('ev-date').value = k;
   $('ev-time').value = src.time || '';
   $('ev-rep').value = repKey(src.rep);
   $('ev-memo').value = src.memo || '';
   $('ev-del').hidden = !ev;
   $('ev-revert').hidden = !(ev && seriesOf(ev));
+  setCat(src.cat || 'work');
   $('sheet').hidden = false;
   if (!ev && !preset) setTimeout(() => $('ev-title').focus(), 50);
 }
@@ -152,6 +217,23 @@ $('cat-pick').addEventListener('click', (e) => {
   const b = e.target.closest('[data-cat]');
   if (b) setCat(b.dataset.cat);
 });
+$('care-kind').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind]');
+  if (b) setKind(b.dataset.kind);
+});
+$('vet-hint').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-d]');
+  if (b) $('ev-date').value = b.dataset.d;
+});
+$('sheet-record').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-rec]');
+  const ev = b && state.events.find((x) => x.id === sheetCtx.id);
+  if (!ev) return;
+  setCareRecord(ev, sheetCtx.k, b.dataset.rec || null);
+  save();
+  render();
+  renderSheetRecord();
+});
 $('ev-time-clear').addEventListener('click', () => { $('ev-time').value = ''; });
 $('sheet').addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeSheet(); });
 $('sheet').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
@@ -165,6 +247,7 @@ function readForm() {
     time: $('ev-time').value || undefined,
     memo: $('ev-memo').value.trim() || undefined,
     rep: rep ? { t: rep[0], n: +rep.slice(1) } : undefined,
+    ck: sheetCat === 'care' ? sheetKind : undefined,
   };
   for (const key of Object.keys(f)) if (f[key] === undefined) delete f[key];
   return f;
@@ -173,7 +256,13 @@ function readForm() {
 /* 반복 일정을 '이 날부터' 바꾸거나 지울 때: 원래 반복은 전날까지로 끝내고 기록을 나눈다 */
 function splitAt(ev, k) {
   const later = {};
-  for (const d in ev.done || {}) if (d >= k) { later[d] = ev.done[d]; delete ev.done[d]; }
+  for (const f of ['done', 'skip']) {
+    for (const d in ev[f] || {}) {
+      if (d < k) continue;
+      later[f] = { ...(later[f] || {}), [d]: ev[f][d] };
+      delete ev[f][d];
+    }
+  }
   if (k <= ev.date) state.events = state.events.filter((x) => x !== ev);
   else ev.until = addDays(k, -1);
   return later;
@@ -184,10 +273,7 @@ function overrideOne(series, k, f) {
   series.ex = [...new Set([...(series.ex || []), k])];
   const one = { id: uid(), ...f, of: series.id, ok: k };
   delete one.rep;
-  if (series.done && series.done[k]) {
-    one.done = { [one.date]: series.done[k] };
-    delete series.done[k];
-  }
+  moveRecord(series, k, one, one.date);
   state.events.push(one);
 }
 
@@ -226,11 +312,11 @@ $('ev-form').addEventListener('submit', async (e) => {
     if (f.rep && ev.ex) next.ex = ev.ex;
     if (!f.rep && ev.of) { next.of = ev.of; next.ok = ev.ok; } // 이 날만 바꾼 회차를 다시 고칠 때
     if (ev.done) next.done = ev.done;
+    if (ev.skip) next.skip = ev.skip;
     state.events[state.events.indexOf(ev)] = next;
   } else {
     const later = splitAt(ev, ctx.k);
-    const next = { id: uid(), ...f };
-    if (Object.keys(later).length) next.done = later;
+    const next = { id: uid(), ...f, ...later };
     state.events.push(next);
     // 이 날 이후에 따로 바꿔 둔 회차는 새 반복에 이어 붙인다
     for (const o of overridesOf(ev)) if (o.ok >= ctx.k) o.of = next.id;
@@ -259,7 +345,7 @@ $('ev-del').addEventListener('click', async () => {
     const cur = state.events.find((x) => x.id === ctx.id);
     if (scope === 'one') {
       cur.ex = [...(cur.ex || []), ctx.k];
-      if (cur.done) delete cur.done[ctx.k];
+      setCareRecord(cur, ctx.k, null);
     } else if (scope === 'after') {
       state.events = state.events.filter((x) => !(x.of === cur.id && x.ok >= ctx.k));
       splitAt(cur, ctx.k);
@@ -280,7 +366,7 @@ $('ev-revert').addEventListener('click', () => {
     if (!series) return;
     series.ex = (series.ex || []).filter((d) => d !== one.ok);
     if (!series.ex.length) delete series.ex;
-    if (one.done && one.done[one.date]) series.done = { ...(series.done || {}), [one.ok]: one.done[one.date] };
+    moveRecord(one, one.date, series, one.ok);
     state.events = state.events.filter((x) => x !== one);
     ui.calSel = one.ok;
     ui.calMonth = monthStart(one.ok);

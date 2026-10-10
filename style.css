@@ -471,7 +471,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .tabs {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   height: calc(var(--tabh) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
@@ -942,3 +942,37 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 
 /* 진료 전 요약 */
 .r-sec.cs li::before { content: "•"; background: var(--c-care-soft); color: var(--c-care); }
+
+/* ═════════════════ 운동 ═════════════════ */
+.wo-total { font-size: 14px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.wo-banner { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--track); font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.wo-banner.done { background: var(--accent-soft); }
+.wo-banner b { color: var(--text); font-size: 14px; }
+.wo-card { margin-bottom: 10px; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.wo-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.wo-name { font-size: 16px; font-weight: 700; }
+.wo-target { font-size: 12px; color: var(--text-3); }
+.wo-amt { margin-left: auto; font-size: 14px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.wo-card.full .wo-amt { color: var(--accent); }
+.wo-row { display: flex; align-items: center; gap: 6px; }
+.wo-row + .wo-row { margin-top: 6px; }
+.wo-set { flex: none; width: 34px; font-size: 12px; color: var(--text-2); }
+.wo-cells { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; }
+.wo-cell {
+  height: 34px;
+  min-width: 0;
+  border-radius: 7px;
+  background: var(--track);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  transition: background .12s ease, color .12s ease;
+}
+.wo-cells.wide .wo-cell { height: 40px; font-size: 13px; border-radius: 9px; }
+.wo-cell.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.wo-note { margin: 6px 4px 12px; font-size: 12px; line-height: 1.6; color: var(--text-3); text-align: center; }
+.wo-actions { flex: none; display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+.wo-btn { height: 48px; border-radius: 12px; background: var(--surface); font-size: 15px; font-weight: 600; color: var(--text-2); }
+.wo-btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.app[data-view="workout"] .toast { bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 76px); }
+.r-sub { margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }

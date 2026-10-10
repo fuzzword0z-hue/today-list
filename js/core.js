@@ -14,6 +14,7 @@
  *   seen: [ 'YYYY-MM' | 'YYYY' ],     열어 본 리포트
  *   lastExport: ms | undefined,       마지막으로 백업 파일을 내보낸 시각
  *   cond: { 'YYYY-MM-DD': { ap, en, vo, st, w, n } }   고양이 컨디션 (js/care.js)
+ *   workout, workouts                 운동 체크 상태와 '오늘 운동 완료' 기록 (js/workout.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 먹임·안 감)이 더 붙는다.
  * }
  */
@@ -33,7 +34,10 @@ function normalize(s) {
   s.v = 2;
   s.events = Array.isArray(s.events) ? s.events : [];
   s.seen = Array.isArray(s.seen) ? s.seen : [];
-  s.cond = s.cond && typeof s.cond === 'object' && !Array.isArray(s.cond) ? s.cond : {};
+  const obj = (o) => o && typeof o === 'object' && !Array.isArray(o);
+  s.cond = obj(s.cond) ? s.cond : {};
+  s.workouts = obj(s.workouts) ? s.workouts : {};
+  s.workout = obj(s.workout) && obj(s.workout.c) ? s.workout : { date: null, c: {} };
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }
@@ -101,7 +105,7 @@ const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l
 /* ───────── 화면 전환 ─────────
  * 탭(오늘·캘린더·통계)은 기록을 남기지 않고 바꾸고(replace),
  * 리포트처럼 '들어가는' 화면만 기록을 남겨(push) 안드로이드 뒤로 가기로 돌아올 수 있게 한다. */
-const VIEWS = ['today', 'cal', 'stats', 'report'];
+const VIEWS = ['today', 'cal', 'workout', 'stats', 'report'];
 
 function route() {
   const h = location.hash.slice(1);
@@ -134,6 +138,7 @@ function render() {
   $('stats-badge').hidden = dueReports().length === 0;
   if (r.view === 'today') renderToday();
   else if (r.view === 'cal') renderCal();
+  else if (r.view === 'workout') renderWorkout();
   else if (r.view === 'stats') renderStats();
   else renderReport(r.id);
 }

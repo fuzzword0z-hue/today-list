@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <title>오늘</title>
 </head>
 <body>
@@ -156,6 +156,27 @@
       <main class="scroll report" id="report"></main>
     </section>
 
+    <!-- ───────── 운동 ───────── -->
+    <section class="view" id="view-workout" hidden>
+      <header class="top">
+        <div class="top-row"><span class="date-sub is-today" id="wo-date"></span></div>
+        <div class="top-row">
+          <h1 class="date-main">운동</h1>
+          <span class="spacer"></span>
+          <span class="wo-total" id="wo-total"></span>
+        </div>
+      </header>
+      <main class="scroll" id="wo-scroll">
+        <div id="wo-status"></div>
+        <div id="wo-list"></div>
+        <p class="wo-note">칸을 누르면 그 칸까지 채워지고, 마지막 칸을 한 번 더 누르면 하나 빠져요.<br>완료 기록은 캘린더에 나오지 않고 월간·연간 리포트에만 반영돼요.</p>
+      </main>
+      <div class="wo-actions">
+        <button class="wo-btn" id="wo-reset">체크 전부 해제</button>
+        <button class="wo-btn primary" id="wo-done">오늘 운동 완료</button>
+      </div>
+    </section>
+
     <!-- ───────── 하단 탭 ───────── -->
     <nav class="tabs" id="tabs" aria-label="화면">
       <button data-tab="today">
@@ -165,6 +186,10 @@
       <button data-tab="cal">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
         <span>캘린더</span>
+      </button>
+      <button data-tab="workout">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg>
+        <span>운동</span>
       </button>
       <button data-tab="stats">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
@@ -234,14 +259,15 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=7"></script>
-  <script src="js/events.js?v=7"></script>
-  <script src="js/today.js?v=7"></script>
-  <script src="js/calendar.js?v=7"></script>
-  <script src="js/stats.js?v=7"></script>
-  <script src="js/report.js?v=7"></script>
-  <script src="js/care.js?v=7"></script>
-  <script src="js/backup.js?v=7"></script>
-  <script src="js/main.js?v=7"></script>
+  <script src="js/core.js?v=8"></script>
+  <script src="js/events.js?v=8"></script>
+  <script src="js/today.js?v=8"></script>
+  <script src="js/calendar.js?v=8"></script>
+  <script src="js/stats.js?v=8"></script>
+  <script src="js/report.js?v=8"></script>
+  <script src="js/care.js?v=8"></script>
+  <script src="js/workout.js?v=8"></script>
+  <script src="js/backup.js?v=8"></script>
+  <script src="js/main.js?v=8"></script>
 </body>
 </html>

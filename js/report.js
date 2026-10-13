@@ -28,6 +28,7 @@ function hasData({ start, end }) {
   for (const k in state.days) if (k >= start && k <= end) return true;
   for (const k in state.cond) if (k >= start && k <= end) return true;
   for (const k in state.workouts) if (k >= start && k <= end) return true;
+  for (const k in state.studies) if (k >= start && k <= end) return true;
   const inRange = (o) => o && Object.keys(o).some((k) => k >= start && k <= end);
   return state.events.some((ev) => inRange(ev.done) || inRange(ev.skip));
 }
@@ -153,22 +154,53 @@ function analyze(id) {
   m.cond = cd;
 
   // 운동 ('오늘 운동 완료'로 남긴 기록). 비율은 처음 운동을 기록한 날부터 센다
-  const wo = { days: 0, full: 0, span: 0, sum: {}, months: yearly ? Array(12).fill(0) : null };
-  for (const ex of EXERCISES) wo.sum[ex.id] = 0;
+  // '운동한 날' = 20분 운동이나 스트레칭을 한 날 (집안일·샤워만 체크한 날은 빼고)
+  const wo = { days: 0, full: 0, ex20: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
+  for (const ex of EXERCISES) { wo.sum[ex.id] = 0; wo.cnt[ex.id] = 0; }
   const firstWo = Object.keys(state.workouts).sort()[0];
   if (firstWo && firstWo <= last) {
     const from = firstWo > start ? firstWo : start;
     wo.span = diffDays(last, from) + 1;
     for (let k = from; k <= last; k = addDays(k, 1)) {
       const r = state.workouts[k];
-      if (!r) continue;
+      if (!r || !(r.ex20 || EXERCISES.some((ex) => r[ex.id]))) continue;
       wo.days++;
       if (r.full) wo.full++;
-      for (const ex of EXERCISES) wo.sum[ex.id] += r[ex.id] || 0;
+      if (r.ex20) wo.ex20++;
+      for (const ex of EXERCISES) if (r[ex.id]) { wo.sum[ex.id] += r[ex.id]; wo.cnt[ex.id]++; }
       if (wo.months) wo.months[parse(k).getMonth()]++;
     }
   }
   m.wo = wo;
+
+  // 공부 + 평일 루틴 (7:00–8:30 공부 · 8:30–9:30 루틴 · 9:30–11:00 공부). 처음 공부를 기록한 날부터 센다
+  const st = {
+    days: 0, min: 0, review: 0, span: 0, wdays: 0, a: 0, b: 0, rt: 0, full: 0, entries: [],
+    wd: Array.from({ length: 7 }, () => ({ n: 0, full: 0 })), months: yearly ? Array(12).fill(0) : null,
+  };
+  const firstSt = Object.keys(state.studies).sort()[0];
+  if (firstSt && firstSt <= last) {
+    const from = firstSt > start ? firstSt : start;
+    st.span = diffDays(last, from) + 1;
+    for (let k = from; k <= last; k = addDays(k, 1)) {
+      const rec = state.studies[k];
+      if (rec && studyHasContent(rec)) {
+        st.days++;
+        st.min += rec.min || 0;
+        if (rec.review) st.review++;
+        st.entries.push({ k, rec });
+        if (st.months) st.months[parse(k).getMonth()] += rec.min || 0;
+      }
+      if ((rec ? rec.mode : dayMode(k)) !== 'weekday') continue;
+      const a = !!(rec && rec.a), b = !!(rec && rec.b), rt = !!(state.workouts[k] && state.workouts[k].routine);
+      st.wdays++;
+      st.a += a; st.b += b; st.rt += rt;
+      const w = st.wd[parse(k).getDay()];
+      w.n++;
+      if (a && b && rt) { st.full++; w.full++; }
+    }
+  }
+  m.st = st;
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
@@ -191,6 +223,7 @@ function score(m) {
   }
   if (m.careSched) parts.push({ label: '케어 기록', v: m.careRecorded / m.careSched, w: 0.2 });
   if (m.wo.days) parts.push({ label: '운동 (한 날)', v: m.wo.days / m.wo.span, w: 0.2 });
+  if (m.st.days && m.st.wdays) parts.push({ label: '평일 루틴', v: m.st.full / m.st.wdays, w: 0.2 });
   if (!parts.length) return null;
   const sw = parts.reduce((a, p) => a + p.w, 0);
   const total = Math.round((parts.reduce((a, p) => a + p.v * p.w, 0) / sw) * 100);
@@ -234,6 +267,11 @@ function feedback(m, p) {
   for (const c of care) {
     if (c.sched >= 3 && c.recorded / c.sched >= 0.95) good.push(`${c.ev.title} ${c.sched}번 중 ${c.recorded}번을 기록했어요. 빠짐없이 챙기고 있어요.`);
   }
+  const S = m.st;
+  if (S.wdays >= 5 && S.full / S.wdays >= 0.7) good.push(`평일 ${S.wdays}일 중 ${S.full}일, 루틴(7:00 공부 · 8:30 루틴 · 9:30 공부)을 모두 지켰어요.`);
+  if (S.min >= (Y ? 6000 : 1200)) good.push(`공부를 ${fmtMin(S.min)} 했어요. 꾸준히 쌓이고 있어요.`);
+  if (S.days >= 5 && S.review / S.days >= 0.6) good.push(`아침 복습을 ${S.review}일 했어요. 떠올려 보는 공부가 습관이 되고 있어요.`);
+  if (m.wo.ex20 >= (Y ? 80 : 8)) good.push(`20분 운동을 ${m.wo.ex20}일 했어요.`);
   if (m.wo.span >= 7 && m.wo.days / m.wo.span >= 0.6) good.push(`${m.wo.span}일 중 ${m.wo.days}일 운동했어요. 꾸준함이 몸에 쌓이고 있어요.`);
   if (m.wo.full >= (Y ? 30 : 5)) good.push(`정한 운동을 끝까지 다 채운 날이 ${m.wo.full}일이에요.`);
   if (m.cond.days >= (Y ? 100 : 10)) good.push(`고양이 컨디션을 ${m.cond.days}일 기록했어요. 진료 때 큰 도움이 돼요.`);
@@ -273,10 +311,26 @@ function feedback(m, p) {
   if (m.hours.n >= 10 && m.hours.night / m.hours.n >= 0.4) {
     improve.push(`완료 체크의 ${pct(m.hours.night / m.hours.n)}%가 밤 10시 이후에 몰려 있어요. 중요한 일은 오전에 두면 하루가 더 여유로워요.`);
   }
-  if (m.days >= 7 && m.active / m.days < 0.6) {
+  if (m.active && m.days >= 7 && m.active / m.days < 0.6) {
     improve.push(`기록이 없는 날이 ${m.days - m.active}일이에요. 아침에 1분만 열어서 오늘 할 일을 적어 보세요.`);
     goals.push(`기록한 날 ${Math.min(m.days, Math.round(m.days * 0.8))}일 이상`);
   }
+  if (S.wdays >= 5) {
+    const blocks = [
+      ['a', '7:00–8:30 공부를', '고양이 케어를 마치면 바로 앉을 수 있게, 전날 밤 11시에 내일 7시에 풀 문제 범위를 정해 두세요.'],
+      ['rt', '8:30–9:30 루틴을', '샤워를 마지막 순서로 두면 씻고 나와서 바로 9:30 공부로 이어져요.'],
+      ['b', '9:30–11:00 공부를', '8:30–9:30에 폰을 멀리 두고, 샤워를 끝내자마자 책상에 앉아 보세요.'],
+    ].map(([f, name, tip]) => ({ name, tip, rate: S[f] / S.wdays, n: S[f] }));
+    const weak = blocks.reduce((x, y) => (y.rate < x.rate ? y : x));
+    if (weak.rate <= 0.6) improve.push(`${weak.name} 지킨 날이 평일 ${S.wdays}일 중 ${weak.n}일이에요. ${weak.tip}`);
+    const wds = S.wd.map((w, i) => ({ i, ...w, rate: w.n ? w.full / w.n : null })).filter((w) => w.n >= 2 && w.i > 0 && w.i < 6);
+    if (wds.length >= 3) {
+      const worst = wds.reduce((x, y) => (y.rate < x.rate ? y : x));
+      if (worst.rate <= S.full / S.wdays - 0.3) improve.push(`${WD[worst.i]}요일에 평일 루틴이 자주 무너져요 (${worst.n}번 중 ${worst.full}번). 그 요일엔 공부 목표를 조금 줄여 보세요.`);
+    }
+    if (S.full / S.wdays < 0.8) goals.push(`평일 루틴 주 ${Math.min(5, Math.max(3, Math.round((S.full / S.wdays) * 5) + 1))}일`);
+  }
+  if (S.days >= 5 && S.review / S.days < 0.3) improve.push(`아침 복습을 ${S.review}일 했어요. 전날 밤에 헷갈린 것 5개만 종이에 적어 머리맡에 두면 아침 15분이 쉬워져요.`);
   if (m.wo.days && m.wo.span >= 10 && m.wo.days / m.wo.span < 0.4) {
     improve.push(`운동한 날이 ${m.wo.span}일 중 ${m.wo.days}일이에요. 하는 시간을 정해 두고(예: 씻기 전) 주 3–4일부터 이어 가 보세요.`);
     goals.push('운동 주 4일');
@@ -323,7 +377,8 @@ function cheer(m, s, W, prev) {
   } else if (m.done) {
     out.push(`${W.this} 할 일 ${m.done}개를 끝냈어요. 작은 체크 하나하나가 쌓여서 만든 결과예요.`);
   }
-  if (m.wo.days) out.push(`스트레칭도 ${m.wo.days}일 챙겼어요. 내 몸을 돌보는 시간도 잊지 않았네요.`);
+  const extra = [m.st.min ? `공부 ${fmtMin(m.st.min)}` : '', m.wo.days ? `운동 ${m.wo.days}일` : ''].filter(Boolean);
+  if (extra.length) out.push(`${W.this} ${extra.join('과 ')}도 챙겼어요. 내 몸과 목표를 함께 돌보고 있어요.`);
   if (prev && prev.rate !== null && m.rate !== null && m.rate > prev.rate + 0.03) out.push(`무엇보다 ${W.prev}보다 나아졌다는 게 가장 큰 성과예요.`);
   out.push(t >= 70 ? `이 흐름 그대로 ${W.next}도 함께 가요.` : `완벽하지 않아도 괜찮아요. ${W.next}엔 하루 한 가지만 확실히 끝내는 것부터 다시 시작해요.`);
   return out.join(' ');
@@ -340,7 +395,7 @@ function renderReport(id) {
   const el = $('report');
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
-  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days)) {
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.st.days)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -382,9 +437,11 @@ function renderReport(id) {
   let woSec = '';
   const woLines = [];
   if (m.wo.days) {
-    const wt = [['운동한 날', `${m.wo.days}<small>/${m.wo.span}일</small>`, m.wo.full ? `<small>다 채운 날 ${m.wo.full}일</small>` : '']];
+    const wt = [['운동한 날', `${m.wo.days}<small>/${m.wo.span}일</small>`, m.wo.full ? `<small>스트레칭 다 채운 날 ${m.wo.full}일</small>` : '']];
+    if (m.wo.ex20) wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, '']);
     for (const ex of EXERCISES) {
-      wt.push([ex.name, esc(exAmount(ex, m.wo.sum[ex.id])), `<small>하루 평균 ${exAmount(ex, Math.round(m.wo.sum[ex.id] / m.wo.days))}</small>`]);
+      if (!m.wo.cnt[ex.id]) continue;
+      wt.push([ex.name, esc(exAmount(ex, m.wo.sum[ex.id])), `<small>한 날 평균 ${exAmount(ex, Math.round(m.wo.sum[ex.id] / m.wo.cnt[ex.id]))}</small>`]);
     }
     for (const [l, v, d] of wt) woLines.push(`- ${l}: ${v.replace(/<[^>]+>/g, '')}${d ? ` (${d.replace(/<[^>]+>/g, '')})` : ''}`);
     const chart = m.yearly ? `<h3 class="r-sub">월별 운동한 날</h3><div class="r-months">${m.wo.months.map((n, i) => {
@@ -395,6 +452,57 @@ function renderReport(id) {
       <div class="r-tiles">${wt.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>
       ${chart}
       <p class="r-tip">운동 탭의 '오늘 운동 완료'로 남긴 기록이에요. 처음 기록한 날부터 세요.</p></section>`;
+  }
+
+  // 공부 (리포트에만 나오는 기록)
+  let stSec = '';
+  const stLines = [];
+  const S = m.st;
+  if (S.days || S.wdays) {
+    const of = (n) => `${n}<small>/${S.wdays}일</small>`;
+    const tl = [
+      ['공부한 날', `${S.days}<small>일</small>`, ''],
+      ['공부 시간', esc(fmtMin(S.min)), S.days ? `<small>한 날 평균 ${fmtMin(Math.round(S.min / S.days))}</small>` : ''],
+      ['아침 복습', `${S.review}<small>일</small>`, ''],
+    ];
+    if (S.wdays) {
+      tl.push(['평일 루틴 다 지킨 날', of(S.full), '']);
+      tl.push(['7:00–8:30 공부', of(S.a), '']);
+      tl.push(['8:30–9:30 루틴', of(S.rt), '']);
+      tl.push(['9:30–11:00 공부', of(S.b), '']);
+    }
+    for (const [l, v, d] of tl) stLines.push(`- ${l}: ${v.replace(/<[^>]+>/g, '')}${d ? ` (${d.replace(/<[^>]+>/g, '')})` : ''}`);
+
+    // 공부한 내용: 주(일–토)별로 묶어서
+    const line = ({ k, rec }) => {
+      const parts = rec.mode === 'weekday'
+        ? STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => `${b.time.split('–')[0]} ${rec[b.id]}`)
+        : (rec.rows || []).map((r) => `${r.s && r.e ? `${r.s}–${r.e} ` : ''}${r.t}`.trim());
+      return `${ml(k)} (${WD[parse(k).getDay()]})${rec.review ? ' [복습]' : ''} ${parts.join(' / ') || '(내용 없음)'}`;
+    };
+    let entriesHtml = '';
+    if (!m.yearly && S.entries.length) {
+      const weeks = [];
+      for (const en of S.entries) {
+        const ws = addDays(en.k, -parse(en.k).getDay());
+        if (!weeks.length || weeks[weeks.length - 1].ws !== ws) weeks.push({ ws, list: [] });
+        weeks[weeks.length - 1].list.push(en);
+      }
+      entriesHtml = `<h3 class="r-sub">공부한 내용</h3>${weeks.map((w) => {
+        const min = w.list.reduce((a, en) => a + (en.rec.min || 0), 0);
+        return `<details class="r-week"><summary>${ml(w.ws)}–${ml(addDays(w.ws, 6))} · ${w.list.length}일 · ${fmtMin(min)}</summary>
+          <ul>${w.list.map((en) => `<li>${esc(line(en))}</li>`).join('')}</ul></details>`;
+      }).join('')}`;
+      stLines.push('', '공부한 내용', ...S.entries.map((en) => `- ${line(en)}`));
+    }
+    const chart = m.yearly ? `<h3 class="r-sub">월별 공부 시간</h3><div class="r-months">${S.months.map((n, i) => {
+      const max = Math.max(...S.months, 1);
+      return `<div class="r-mcol"><span class="r-mval">${n ? Math.round(n / 60) : ''}</span><span class="r-mbar"><i style="height:${n ? Math.max(2, Math.round((n / max) * 100)) : 0}%"></i></span><span class="r-mlab">${i + 1}</span></div>`;
+    }).join('')}</div><p class="r-tip">막대 위 숫자는 시간이에요.</p>` : '';
+    stSec = `<section class="r-sec"><h2>공부</h2>
+      <div class="r-tiles">${tl.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>
+      ${chart}${entriesHtml}
+      <p class="r-tip">공부 탭의 '오늘 공부 완료'로 남긴 기록이에요. 평일 루틴은 운동 탭의 8:30–9:30 루틴까지 세 칸을 모두 채운 날이에요.</p></section>`;
   }
 
   let monthsChart = '';
@@ -437,6 +545,7 @@ function renderReport(id) {
       ${prev ? `<p class="r-tip">▲▼ 는 ${f.W.prev}와 비교한 값이에요.</p>` : ''}
     </section>
     ${monthsChart}
+    ${stSec}
     ${woSec}
     <section class="r-sec good"><h2>잘하고 있는 점</h2><ul>${li(f.good)}</ul></section>
     <section class="r-sec cheer"><h2>긍정적인 평가</h2><p>${esc(cheerText)}</p></section>
@@ -453,6 +562,7 @@ function renderReport(id) {
     '',
     '숫자로 보기',
     ...tiles.map(([l, v]) => `- ${l}: ${v.replace(/<[^>]+>/g, '')}`),
+    ...(stLines.length ? ['', '공부', ...stLines] : []),
     ...(woLines.length ? ['', '운동', ...woLines] : []),
     '',
     '잘하고 있는 점', ...f.good.map((t) => `- ${t}`),

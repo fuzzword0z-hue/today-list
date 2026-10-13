@@ -142,7 +142,7 @@ function analyze(id) {
     .map((d) => ({ ev: d.ev, k: d.k, done: isDone(d.ev, d.k) }));
 
   // 고양이 컨디션
-  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [] };
+  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [], th: 0 };
   for (let k = start; k <= last; k = addDays(k, 1)) {
     const c = condOf(k);
     if (!c) continue;
@@ -150,12 +150,13 @@ function analyze(id) {
     if (hasSymptom(c)) cd.sym++;
     if (c.vo && c.vo !== '0') { cd.vomitDays++; cd.vomit += +c.vo; }
     if (c.w) cd.w.push({ k, w: c.w });
+    if (c.th) cd.th++;
   }
   m.cond = cd;
 
   // 운동 ('오늘 운동 완료'로 남긴 기록). 비율은 처음 운동을 기록한 날부터 센다
-  // '운동한 날' = 20분 운동이나 스트레칭을 한 날 (집안일·샤워만 체크한 날은 빼고)
-  const wo = { days: 0, full: 0, ex20: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
+  // '운동한 날' = 20분 운동·실내자전거·스트레칭 중 하나라도 한 날 (집안일·샤워만 체크한 날은 빼고)
+  const wo = { days: 0, full: 0, ex20: 0, v20: {}, bike: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
   for (const ex of EXERCISES) { wo.sum[ex.id] = 0; wo.cnt[ex.id] = 0; }
   const firstWo = Object.keys(state.workouts).sort()[0];
   if (firstWo && firstWo <= last) {
@@ -163,10 +164,15 @@ function analyze(id) {
     wo.span = diffDays(last, from) + 1;
     for (let k = from; k <= last; k = addDays(k, 1)) {
       const r = state.workouts[k];
-      if (!r || !(r.ex20 || EXERCISES.some((ex) => r[ex.id]))) continue;
+      if (!r || !(r.ex20 || r.bike || EXERCISES.some((ex) => r[ex.id]))) continue;
       wo.days++;
       if (r.full) wo.full++;
-      if (r.ex20) wo.ex20++;
+      if (r.ex20) {
+        wo.ex20++;
+        const v = W20[r.w20v] ? r.w20v : 'v1';
+        wo.v20[v] = (wo.v20[v] || 0) + 1;
+      }
+      wo.bike += r.bike || 0;
       for (const ex of EXERCISES) if (r[ex.id]) { wo.sum[ex.id] += r[ex.id]; wo.cnt[ex.id]++; }
       if (wo.months) wo.months[parse(k).getMonth()]++;
     }
@@ -424,6 +430,7 @@ function renderReport(id) {
   for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, c.skipped.length ? `<small>못 먹임 ${c.skipped.length}회</small>` : '']);
   if (m.visits.length) tiles.push(['진료', `${m.visits.filter((v) => v.done).length}<small>회</small>`, '']);
   if (m.cond.days) tiles.push(['컨디션 기록', `${m.cond.days}<small>일</small>`, m.cond.sym ? `<small>이상 ${m.cond.sym}일</small>` : '']);
+  if (m.cond.th) tiles.push(['고양이 양치', `${m.cond.th}<small>/${m.days}일</small>`, '']);
   if (m.cond.vomit) tiles.push(['구토', `${m.cond.vomit}<small>회${m.cond.vomit > m.cond.vomitDays ? '+' : ''}</small>`, `<small>${m.cond.vomitDays}일</small>`]);
   if (m.cond.w.length >= 2) {
     const a = m.cond.w[0].w, b = m.cond.w[m.cond.w.length - 1].w;
@@ -438,7 +445,11 @@ function renderReport(id) {
   const woLines = [];
   if (m.wo.days) {
     const wt = [['운동한 날', `${m.wo.days}<small>/${m.wo.span}일</small>`, m.wo.full ? `<small>스트레칭 다 채운 날 ${m.wo.full}일</small>` : '']];
-    if (m.wo.ex20) wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, '']);
+    if (m.wo.ex20) {
+      const by = Object.entries(W20).filter(([id]) => m.wo.v20[id]).map(([id, w]) => `${w.label} ${m.wo.v20[id]}`);
+      wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, by.length > 1 || !m.wo.v20.v1 ? `<small>${by.join(' · ')}</small>` : '']);
+    }
+    if (m.wo.bike) wt.push(['실내자전거', esc(fmtMin(m.wo.bike)), '']);
     for (const ex of EXERCISES) {
       if (!m.wo.cnt[ex.id]) continue;
       wt.push([ex.name, esc(exAmount(ex, m.wo.sum[ex.id])), `<small>한 날 평균 ${exAmount(ex, Math.round(m.wo.sum[ex.id] / m.wo.cnt[ex.id]))}</small>`]);

@@ -1,9 +1,10 @@
 'use strict';
 
 /* ═════════════════ 운동 ═════════════════
- * state.workout  = { date, c: { back: [n, n, n], shoulder: [n, n, n], plank: n, side: n,
- *                               rt: { ex20, chores, shower }, rounds: n, period: n, bike: n } }
- *   지금 체크해 둔 상태 (date = 마지막으로 체크한 날). '체크 전부 해제'로만 비운다.
+ * state.workout  = { date, touched, c: { back: [n, n, n], shoulder: [n, n, n], plank: n, side: n,
+ *                                        rt: { ex20, chores, shower }, rounds: n, period: n, bike: n } }
+ *   지금 체크해 둔 상태. date = 이 체크를 기록할 날 (위 '기록 날짜'), touched = 마지막으로 만진 날.
+ *   touched가 오늘이 아니면 '지난 날 체크가 남아 있음' → 기록·지우기·이어서 중에 고르기 전까지 칸을 잠근다.
  *   rounds / period / bike = 20분 운동 버전별 진행 칸 수
  * state.w20v = 'v1' | 'period' | 'bike'   고른 20분 운동 버전 (체크를 지워도 유지)
  * state.workouts = { 'YYYY-MM-DD': { back, shoulder, plank, side, full, ex20, w20v, chores, shower,
@@ -107,28 +108,59 @@ function woSnapshot(c) {
   rec.routine = ROUTINE.every((r) => rec[r.id]) ? 1 : 0;
   return rec;
 }
-const sameRecord = (a, b) => !!a && !!b && Object.keys(a).every((k) => k === 'at' || a[k] === b[k]);
+const sameRecord = (a, b) => !!a && !!b && Object.keys(a).every((k) => k === 'at' || a[k] === b[k] || (!a[k] && !b[k]));
+
+/* 기록 날짜와 '지난 날 체크가 남아 있음' */
+const woTouched = () => state.workout.touched || state.workout.date;
+const woStale = () => hasChecks(woChecks()) && !!woTouched() && woTouched() !== today;
+function woRecDate() {
+  if (woStale()) return state.workout.date || woTouched();
+  return state.workout.touched === today && state.workout.date ? state.workout.date : today;
+}
+
+/* 남겨 둔 기록 → 체크 칸 (지난 날 기록을 불러와 고칠 때) */
+function recordToChecks(rec) {
+  const c = { rt: {} };
+  for (const ex of EXERCISES) {
+    let n = rec[ex.id] || 0;
+    if (ex.sets) c[ex.id] = Array.from({ length: ex.sets }, () => { const v = Math.min(ex.reps, n); n -= v; return v; });
+    else c[ex.id] = Math.round(n / ex.step);
+  }
+  for (const r of ROUTINE) if (rec[r.id]) c.rt[r.id] = 1;
+  c.rounds = rec.rounds || 0;
+  c.period = rec.period || 0;
+  c.bike = Math.round((rec.bike || 0) / W20.bike.unit);
+  return c;
+}
 
 function renderWorkout() {
   const c = woChecks();
-  const rec = state.workouts[today];
+  const k = woRecDate();
+  const rec = state.workouts[k];
   const on = EXERCISES.reduce((a, ex) => a + cellsOn(ex, c), 0);
   const all = EXERCISES.reduce((a, ex) => a + exCells(ex), 0);
-  const weekday = dayMode(today) === 'weekday';
-  $('wo-date').textContent = `${mdw(today)}${weekday ? '' : ' · 쉬는 날'}`;
+  const weekday = dayMode(k) === 'weekday';
+  const stale = woStale();
+  $('wo-date').textContent = `${mdw(today)}${dayMode(today) === 'weekday' ? '' : ' · 쉬는 날'}`;
   $('wo-total').textContent = `스트레칭 ${on} / ${all}칸`;
-
-  // 지난 날 체크가 남아 있을 때, 오늘 이미 완료했을 때
-  const stale = hasChecks(c) && state.workout.date && state.workout.date !== today;
+  $('view-workout').classList.toggle('locked', stale);
+  $('wo-recdate').innerHTML = stale ? '' : recDateRow(k);
   const recText = (r) => [
     r.ex20 ? `20분 운동${r.w20v && r.w20v !== 'v1' ? `(${W20[r.w20v].label})` : ''} ✓` : '',
     r.routine ? '8:30 루틴 ✓' : '',
     ...EXERCISES.filter((ex) => r[ex.id]).map((ex) => `${ex.name} ${exAmount(ex, r[ex.id])}`),
   ].filter(Boolean).join(' · ');
-  $('wo-status').innerHTML = [
-    rec ? `<div class="wo-banner done"><b>오늘 운동을 기록했어요</b><span>${recText(rec)}</span></div>` : '',
-    stale ? `<div class="wo-banner"><span>${md(state.workout.date)}에 체크한 내용이 남아 있어요. 새로 시작하려면 아래 <b>체크 전부 해제</b>를 눌러 주세요.</span></div>` : '',
-  ].join('');
+  // 지난 날 체크가 남아 있으면: 그 날로 기록 / 지우기 / 오늘 것으로 이어서 중에 고르기
+  $('wo-status').innerHTML = stale ? `<div class="wo-banner stale">
+      <b>${md(k)}에 체크한 내용이 남아 있어요</b>
+      <span>${sameRecord(woSnapshot(c), rec) ? '이미 그 날 기록과 같아요.' : '아직 그 날 기록으로 남기지 않았어요.'} 어떻게 할까요?</span>
+      <div class="stale-acts">
+        <button class="wo-btn primary" data-stale="save">${ml(k)}로 기록하고 새로 시작</button>
+        <button class="wo-btn" data-stale="clear">기록하지 않고 지우기</button>
+        <button class="wo-btn" data-stale="continue">오늘 것으로 이어서</button>
+      </div>
+    </div>`
+    : rec ? `<div class="wo-banner done"><b>${k === today ? '오늘' : md(k)} 운동을 기록했어요</b><span>${recText(rec)}</span></div>` : '';
 
   // 평일 8:30–9:30 루틴 + 20분 운동
   const rt = rtOf(c);
@@ -168,7 +200,7 @@ function renderWorkout() {
     </section>`;
   }).join('');
 
-  $('wo-done').textContent = rec ? '완료 기록 고치기' : '오늘 운동 완료';
+  $('wo-done').textContent = k === today ? (rec ? '완료 기록 고치기' : '오늘 운동 완료') : `${ml(k)} ${rec ? '기록 고치기' : '운동 완료'}`;
 }
 
 /* 20분 운동: 버전 고르기 + 그 버전의 목록(접기) + 진행 칸 */
@@ -205,7 +237,8 @@ function cellsHtml(n, filled, label, aria) {
 }
 
 function setWorkout(c) {
-  state.workout = { date: today, c };
+  if (woStale()) return;
+  state.workout = { date: woRecDate(), touched: today, c };
   save();
   if (navigator.vibrate) navigator.vibrate(5);
   renderWorkout();
@@ -214,7 +247,7 @@ function setWorkout(c) {
 /* 칸을 누르면 그 칸까지 채운다. 마지막으로 채운 칸을 다시 누르면 한 칸 뺀다 */
 function onCell(e) {
   const b = e.target.closest('.wo-cell');
-  if (!b) return;
+  if (!b || woStale()) return;
   const box = b.parentElement;
   const i = +b.dataset.i;
   const c = { ...woChecks() };
@@ -245,7 +278,7 @@ $('wo-routine').addEventListener('click', (e) => {
   const ver = e.target.closest('[data-w20]');
   if (ver) { state.w20v = ver.dataset.w20; save(); renderWorkout(); return; }
   const item = e.target.closest('[data-rt]');
-  if (item) {
+  if (item && !woStale()) {
     const c = { ...woChecks() };
     const rt = { ...rtOf(c) };
     if (rt[item.dataset.rt]) delete rt[item.dataset.rt]; else rt[item.dataset.rt] = 1;
@@ -259,7 +292,7 @@ $('wo-routine').addEventListener('click', (e) => {
 /* 기록은 체크한 날짜로 남긴다 (어제 체크를 오늘 완료해도 어제 기록) */
 function recordWorkout(silent) {
   const c = woChecks();
-  const k = state.workout.date || today;
+  const k = woRecDate();
   const rec = { ...woSnapshot(c), at: Date.now() };
   const had = !!state.workouts[k];
   const msg = k !== today ? `${md(k)} 운동으로 기록했어요` : had ? '오늘 운동 기록을 고쳤어요' : '오늘 운동을 기록했어요 · 리포트에 반영돼요';
@@ -268,16 +301,59 @@ function recordWorkout(silent) {
   return msg;
 }
 
-$('wo-done').addEventListener('click', () => {
-  if (!hasChecks(woChecks())) { toast('체크한 운동이 없어요'); return; }
+$('wo-done').addEventListener('click', async () => {
+  const c = woChecks();
+  if (!hasChecks(c)) { toast('체크한 운동이 없어요'); return; }
+  const k = woRecDate();
+  // 지난 날 기록을 다른 내용으로 덮어쓸 때는 한 번 더 묻는다
+  if (k !== today && state.workouts[k] && !sameRecord(woSnapshot(c), state.workouts[k])) {
+    const ok = await choose(`${md(k)} 운동 기록이 이미 있어요. 지금 체크한 내용으로 바꿀까요?`, [{ label: '지금 내용으로 바꾸기', value: 'yes' }]);
+    if (ok !== 'yes') return;
+  }
   recordWorkout(false);
+});
+
+/* 지난 날 체크가 남아 있을 때 고르는 세 가지 */
+$('wo-status').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-stale]');
+  if (!b) return;
+  const k = woRecDate();
+  const fresh = { date: today, touched: today, c: {} };
+  if (b.dataset.stale === 'save') {
+    undoable(`${md(k)} 운동으로 기록하고 새로 시작해요`, () => { recordWorkout(true); state.workout = fresh; });
+  } else if (b.dataset.stale === 'clear') {
+    undoable('남아 있던 체크를 지웠어요', () => { state.workout = fresh; });
+  } else {
+    state.workout = { ...state.workout, date: today, touched: today };
+    save();
+    renderWorkout();
+  }
+});
+
+/* 기록 날짜 바꾸기: 지금 칸이 그 날 기록과 같으면(=고친 게 없으면) 새 날짜의 기록을 불러오고,
+ * 아직 기록하지 않은 체크가 있으면 그 체크를 새 날짜로 옮긴다 */
+bindRecDate($('wo-recdate'), (nk) => {
+  const c = woChecks();
+  const cur = woRecDate();
+  const clean = !hasChecks(c) || sameRecord(woSnapshot(c), state.workouts[cur]);
+  let next = c;
+  if (clean) {
+    const r = state.workouts[nk];
+    next = r ? recordToChecks(r) : {};
+    if (r && W20[r.w20v]) state.w20v = r.w20v;
+  }
+  state.workout = { date: nk, touched: today, c: next };
+  save();
+  renderWorkout();
+  if (!clean) toast(`체크한 내용을 ${nk === today ? '오늘' : md(nk)} 기록으로 옮겼어요`);
+  else if (nk !== today) toast(state.workouts[nk] ? `${md(nk)} 기록을 불러왔어요` : `${md(nk)} 기록을 새로 써요`);
 });
 
 /* 지우기 전에: 아직 기록하지 않은(또는 기록과 다른) 체크가 있으면 물어본다 */
 $('wo-reset').addEventListener('click', async () => {
   const c = woChecks();
   if (!hasChecks(c)) { toast('지울 체크가 없어요'); return; }
-  const k = state.workout.date || today;
+  const k = woRecDate();
   let how = 'clear';
   if (!sameRecord(woSnapshot(c), state.workouts[k])) {
     how = await choose(`${k === today ? '오늘' : md(k)} 체크한 내용을 아직 기록하지 않았어요.`, [
@@ -288,6 +364,6 @@ $('wo-reset').addEventListener('click', async () => {
   }
   undoable(how === 'save' ? '기록하고 체크를 모두 해제했어요' : '체크를 모두 해제했어요', () => {
     if (how === 'save') recordWorkout(true);
-    state.workout = { date: today, c: {} };
+    state.workout = { date: today, touched: today, c: {} };
   });
 });

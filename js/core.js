@@ -192,3 +192,32 @@ function choose(title, options) {
     };
   });
 }
+
+/* ───────── 운동·공부 탭 위 '기록 날짜' 줄 ─────────
+ * 지난 날 기록을 새로 쓰거나 고칠 때 날짜를 고른다 (미래 날짜는 고를 수 없음) */
+function recDateRow(k) {
+  const past = k !== today;
+  return `<div class="rec-date${past ? ' past' : ''}">
+    <label class="rd-btn"><span class="rd-label">기록 날짜</span><b>${mdw(k)}${past ? '' : ' · 오늘'}</b>
+      <svg class="rd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      <input type="date" class="rd-input" value="${k}" max="${today}" aria-label="기록 날짜 고르기"></label>
+    ${past ? '<button class="pill rd-today" data-rd-today>오늘로</button>' : ''}
+  </div>`;
+}
+
+function bindRecDate(el, onPick) {
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-rd-today]')) { onPick(today); return; }
+    // 데스크톱 크롬은 날짜 칸을 눌러도 달력이 안 열려서 직접 연다
+    if (e.target.classList.contains('rd-input') && e.target.showPicker) {
+      try { e.target.showPicker(); } catch (err) { /* 이미 열려 있음 */ }
+    }
+  });
+  el.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('rd-input')) return;
+    const v = e.target.value;
+    if (v && v <= today) onPick(v);
+    else { toast('오늘이나 지난 날짜만 고를 수 있어요'); render(); }
+  });
+}
+

@@ -1,8 +1,8 @@
 'use strict';
 
 /* ═════════════════ 고양이 케어: 컨디션 기록 · 체크 누락 확인 · 진료 전 요약 ═════════════════
- * state.cond = { 'YYYY-MM-DD': { ap, en, vo, st, w, n } }
- *   ap 식욕 · en 활력 · vo 구토 · st 배변 (아래 COND의 값) · w 체중(kg) · n 메모 */
+ * state.cond = { 'YYYY-MM-DD': { ap, en, vo, st, w, n, th } }
+ *   ap 식욕 · en 활력 · vo 구토 · st 배변 (아래 COND의 값) · w 체중(kg) · n 메모 · th 치아 이 닦임(1) */
 
 const COND = [
   { f: 'ap', label: '식욕', opts: [['good', '잘 먹음'], ['normal', '보통'], ['low', '적게'], ['none', '안 먹음']], bad: ['low', 'none'] },
@@ -28,6 +28,7 @@ function condSummary(c) {
   const recorded = COND.some((x) => c[x.f]);
   const parts = bad.length ? bad : recorded ? ['특이 사항 없음'] : [];
   if (c.w) parts.push(fmtKg(c.w));
+  if (c.th) parts.push('양치 ✓');
   if (!parts.length && c.n) parts.push('메모');
   return parts.join(' · ');
 }
@@ -138,6 +139,9 @@ function renderCond() {
       <span class="cond-sum${hasSymptom(c) ? ' bad' : ''}">${sum ? esc(sum) : '기록하기'}</span>
       <svg class="cond-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
+    <button class="rt-item cond-th${c && c.th ? ' on' : ''}" id="cond-th" aria-pressed="${!!(c && c.th)}">
+      <span class="check">${CHECK_SVG}</span><span class="rt-text"><span class="rt-label">치아 이 닦이기</span></span>
+    </button>
     ${open ? `<div class="cond-body">
       ${COND.map((x) => `<div class="cond-row"><span class="cond-label">${x.label}</span><div class="chips" data-f="${x.f}">
         ${x.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${!!c && c[x.f] === v}" class="${x.bad.includes(v) ? 'bad' : ''}">${l}</button>`).join('')}
@@ -170,6 +174,17 @@ $('cond').addEventListener('click', (e) => {
   if (e.target.closest('.cond-head')) {
     condOpenFor = condOpenFor === ui.date ? null : ui.date;
     renderCond();
+    return;
+  }
+  // 치아 이 닦이기: 카드를 펼치지 않아도 바로 체크
+  const th = e.target.closest('#cond-th');
+  if (th) {
+    const on = !(condOf(ui.date) && condOf(ui.date).th);
+    setCond(ui.date, 'th', on ? 1 : null);
+    th.classList.toggle('on', on);
+    th.setAttribute('aria-pressed', String(on));
+    if (on && navigator.vibrate) navigator.vibrate(8);
+    updateCondHead();
     return;
   }
   const b = e.target.closest('.chips [data-v]');
@@ -232,7 +247,8 @@ function careSummaryData() {
   const vomit = recs.filter(([, r]) => r.vo && r.vo !== '0').map(([k, r]) => ({ k, n: +r.vo }));
   const weights = recs.filter(([, r]) => r.w).map(([k, r]) => ({ k, w: r.w }));
   const notes = recs.filter(([, r]) => r.n).map(([k, r]) => ({ k, n: r.n }));
-  return { last, next, from, to, days, doses, recs, ap: count('ap'), en: count('en'), st: count('st'), vomit, weights, notes };
+  const teeth = recs.filter(([, r]) => r.th).length;
+  return { last, next, from, to, days, doses, recs, ap: count('ap'), en: count('en'), st: count('st'), vomit, weights, notes, teeth };
 }
 
 function renderCareSummary() {
@@ -271,6 +287,7 @@ function renderCareSummary() {
       const total = s.vomit.reduce((a, v) => a + v.n, 0);
       cond.push(`구토: ${s.vomit.length}일, ${total}회${s.vomit.some((v) => v.n >= 2) ? ' 이상' : ''} (${s.vomit.map((v) => `${ml(v.k)}${v.n >= 2 ? ' 2회+' : ''}`).join(', ')})`);
     } else if (s.recs.some(([, r]) => r.vo === '0')) cond.push('구토: 없음');
+    if (s.teeth) cond.push(`양치: ${s.teeth}일 / ${s.days}일`);
   }
   if (s.weights.length) {
     const a = s.weights[0];

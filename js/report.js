@@ -142,7 +142,7 @@ function analyze(id) {
     .map((d) => ({ ev: d.ev, k: d.k, done: isDone(d.ev, d.k) }));
 
   // 고양이 컨디션
-  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [] };
+  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [], th: 0 };
   for (let k = start; k <= last; k = addDays(k, 1)) {
     const c = condOf(k);
     if (!c) continue;
@@ -150,6 +150,7 @@ function analyze(id) {
     if (hasSymptom(c)) cd.sym++;
     if (c.vo && c.vo !== '0') { cd.vomitDays++; cd.vomit += +c.vo; }
     if (c.w) cd.w.push({ k, w: c.w });
+    if (c.th) cd.th++;
   }
   m.cond = cd;
 
@@ -424,6 +425,7 @@ function renderReport(id) {
   for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, c.skipped.length ? `<small>못 먹임 ${c.skipped.length}회</small>` : '']);
   if (m.visits.length) tiles.push(['진료', `${m.visits.filter((v) => v.done).length}<small>회</small>`, '']);
   if (m.cond.days) tiles.push(['컨디션 기록', `${m.cond.days}<small>일</small>`, m.cond.sym ? `<small>이상 ${m.cond.sym}일</small>` : '']);
+  if (m.cond.th) tiles.push(['고양이 양치', `${m.cond.th}<small>/${m.days}일</small>`, '']);
   if (m.cond.vomit) tiles.push(['구토', `${m.cond.vomit}<small>회${m.cond.vomit > m.cond.vomitDays ? '+' : ''}</small>`, `<small>${m.cond.vomitDays}일</small>`]);
   if (m.cond.w.length >= 2) {
     const a = m.cond.w[0].w, b = m.cond.w[m.cond.w.length - 1].w;

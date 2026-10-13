@@ -956,7 +956,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .wo-card.full .wo-amt { color: var(--accent); }
 .wo-row { display: flex; align-items: center; gap: 6px; }
 .wo-row + .wo-row { margin-top: 6px; }
-.wo-set { flex: none; width: 34px; font-size: 12px; color: var(--text-2); }
+.wo-set { flex: none; min-width: 34px; white-space: nowrap; font-size: 12px; color: var(--text-2); }
 .wo-cells { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; }
 .wo-cell {
   height: 34px;
@@ -1046,3 +1046,29 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .cond-th.on .rt-label { color: var(--text-2); text-decoration: none; }
 .w20-ver { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; }
 .w20-ver button { padding: 6px 4px; }
+
+/* ───────── 기록 날짜 줄 · 지난 날 내용 남아 있음 ───────── */
+.rec-date { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.rd-btn {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 14px;
+  cursor: pointer;
+}
+.rd-label { color: var(--text-2); }
+.rd-btn b { font-weight: 700; }
+.rd-chev { width: 18px; height: 18px; margin-left: auto; color: var(--text-3); }
+.rd-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; cursor: pointer; }
+.rec-date.past .rd-btn { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.wo-banner.stale { gap: 4px; background: var(--accent-soft); }
+.stale-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.stale-acts .wo-btn { height: 40px; font-size: 13px; }
+.stale-acts .wo-btn.primary { grid-column: 1 / -1; }
+.locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-text, .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }

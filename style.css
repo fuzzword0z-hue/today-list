@@ -471,7 +471,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .tabs {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: calc(var(--tabh) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
@@ -976,3 +976,67 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .wo-btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .app[data-view="workout"] .toast { bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 76px); }
 .r-sub { margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+
+/* ───────── 운동: 8:30–9:30 루틴 · 20분 운동 ───────── */
+.rt-list { list-style: none; margin: 0; padding: 0; }
+.rt-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 6px 2px; text-align: left; }
+.rt-item .check svg { opacity: 0; }
+.rt-item.on .check { background: var(--accent); border-color: var(--accent); }
+.rt-item.on .check svg { opacity: 1; }
+.rt-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rt-label { font-size: 16px; }
+.rt-item.on .rt-label { color: var(--text-3); text-decoration: line-through; }
+.rt-sub { font-size: 12px; color: var(--text-3); }
+.w20-head { display: flex; align-items: baseline; gap: 8px; width: 100%; margin-bottom: 8px; text-align: left; }
+.w20-head .cond-chev { align-self: center; }
+.w20-head[aria-expanded="true"] .cond-chev { transform: rotate(180deg); }
+.w20-body { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg); }
+.w20-part { margin: 8px 0 4px; font-size: 13px; font-weight: 700; color: var(--text); }
+.w20-part:first-child { margin-top: 0; }
+.w20-items { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.7; color: var(--text-2); }
+.w20-tip { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.wo-sub { margin-top: 18px; }
+
+/* ───────── 공부 ───────── */
+.mini-seg { display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 9px; background: var(--track); }
+.mini-seg button { padding: 4px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.mini-seg button[aria-checked="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.st-exams { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.st-exam { padding: 4px 10px; border-radius: 999px; background: var(--c-work-soft); font-size: 13px; color: var(--text); }
+.st-exam b { font-variant-numeric: tabular-nums; margin-right: 2px; }
+.st-review { margin-bottom: 10px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); }
+.st-text {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  resize: none;
+}
+.st-row { display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: center; gap: 4px 4px; }
+.st-row + .st-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.st-row-text { grid-column: 1 / -1; }
+.st-time, .st-row-text {
+  min-width: 0;
+  height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.st-row-text { padding: 0 10px; }
+.st-tilde { text-align: center; color: var(--text-3); }
+.app[data-view="study"] .toast { bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 76px); }
+.r-week { margin-top: 6px; border-radius: 10px; background: var(--bg); }
+.r-week summary { padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.r-week ul { padding: 0 12px 10px !important; gap: 6px !important; }
+.r-week li { padding-left: 0 !important; font-size: 14px !important; line-height: 1.5 !important; color: var(--text-2); }
+.r-week li::before { content: none !important; }
+.st-text:focus, .st-row-text:focus, .st-time:focus, .cond-memo:focus, .cond-w:focus { outline: none; border-color: var(--accent); }

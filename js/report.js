@@ -155,8 +155,8 @@ function analyze(id) {
   m.cond = cd;
 
   // 운동 ('오늘 운동 완료'로 남긴 기록). 비율은 처음 운동을 기록한 날부터 센다
-  // '운동한 날' = 20분 운동이나 스트레칭을 한 날 (집안일·샤워만 체크한 날은 빼고)
-  const wo = { days: 0, full: 0, ex20: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
+  // '운동한 날' = 20분 운동·실내자전거·스트레칭 중 하나라도 한 날 (집안일·샤워만 체크한 날은 빼고)
+  const wo = { days: 0, full: 0, ex20: 0, v20: {}, bike: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
   for (const ex of EXERCISES) { wo.sum[ex.id] = 0; wo.cnt[ex.id] = 0; }
   const firstWo = Object.keys(state.workouts).sort()[0];
   if (firstWo && firstWo <= last) {
@@ -164,10 +164,15 @@ function analyze(id) {
     wo.span = diffDays(last, from) + 1;
     for (let k = from; k <= last; k = addDays(k, 1)) {
       const r = state.workouts[k];
-      if (!r || !(r.ex20 || EXERCISES.some((ex) => r[ex.id]))) continue;
+      if (!r || !(r.ex20 || r.bike || EXERCISES.some((ex) => r[ex.id]))) continue;
       wo.days++;
       if (r.full) wo.full++;
-      if (r.ex20) wo.ex20++;
+      if (r.ex20) {
+        wo.ex20++;
+        const v = W20[r.w20v] ? r.w20v : 'v1';
+        wo.v20[v] = (wo.v20[v] || 0) + 1;
+      }
+      wo.bike += r.bike || 0;
       for (const ex of EXERCISES) if (r[ex.id]) { wo.sum[ex.id] += r[ex.id]; wo.cnt[ex.id]++; }
       if (wo.months) wo.months[parse(k).getMonth()]++;
     }
@@ -440,7 +445,11 @@ function renderReport(id) {
   const woLines = [];
   if (m.wo.days) {
     const wt = [['운동한 날', `${m.wo.days}<small>/${m.wo.span}일</small>`, m.wo.full ? `<small>스트레칭 다 채운 날 ${m.wo.full}일</small>` : '']];
-    if (m.wo.ex20) wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, '']);
+    if (m.wo.ex20) {
+      const by = Object.entries(W20).filter(([id]) => m.wo.v20[id]).map(([id, w]) => `${w.label} ${m.wo.v20[id]}`);
+      wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, by.length > 1 || !m.wo.v20.v1 ? `<small>${by.join(' · ')}</small>` : '']);
+    }
+    if (m.wo.bike) wt.push(['실내자전거', esc(fmtMin(m.wo.bike)), '']);
     for (const ex of EXERCISES) {
       if (!m.wo.cnt[ex.id]) continue;
       wt.push([ex.name, esc(exAmount(ex, m.wo.sum[ex.id])), `<small>한 날 평균 ${exAmount(ex, Math.round(m.wo.sum[ex.id] / m.wo.cnt[ex.id]))}</small>`]);

@@ -1044,3 +1044,5 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .cond-th .check { width: 22px; height: 22px; }
 .cond-th.on .check { background: var(--c-care); border-color: var(--c-care); }
 .cond-th.on .rt-label { color: var(--text-2); text-decoration: none; }
+.w20-ver { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; }
+.w20-ver button { padding: 6px 4px; }

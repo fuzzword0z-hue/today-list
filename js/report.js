@@ -198,7 +198,7 @@ function analyze(id) {
         if (st.months) st.months[parse(k).getMonth()] += rec.min || 0;
       }
       if ((rec ? rec.mode : dayMode(k)) !== 'weekday') continue;
-      const a = !!(rec && rec.a), b = !!(rec && rec.b), rt = !!(state.workouts[k] && state.workouts[k].routine);
+      const a = blockDone(rec, STUDY_BLOCKS[0]), b = blockDone(rec, STUDY_BLOCKS[1]), rt = !!(state.workouts[k] && state.workouts[k].routine);
       st.wdays++;
       st.a += a; st.b += b; st.rt += rt;
       const w = st.wd[parse(k).getDay()];
@@ -486,9 +486,7 @@ function renderReport(id) {
 
     // 공부한 내용: 주(일–토)별로 묶어서
     const line = ({ k, rec }) => {
-      const parts = rec.mode === 'weekday'
-        ? STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => `${b.time.split('–')[0]} ${rec[b.id]}`)
-        : (rec.rows || []).map((r) => `${r.s && r.e ? `${r.s}–${r.e} ` : ''}${r.t}`.trim());
+      const parts = studyParts(rec);
       return `${ml(k)} (${WD[parse(k).getDay()]})${rec.review ? ' [복습]' : ''} ${parts.join(' / ') || '(내용 없음)'}`;
     };
     let entriesHtml = '';

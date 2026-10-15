@@ -2,17 +2,21 @@
 
 /* ═════════════════ 공부 ═════════════════
  * 운동 탭처럼 페이지 하나를 매일 다시 쓴다. '오늘 공부 완료'로 남긴 기록은 리포트에만 쓴다.
- * state.study   = { date, touched, review, a, b, rows: [{ s, e, t }] }   지금 적어 둔 내용
+ * state.study   = { date, touched, review, rows: [{ s, e, t }] }   지금 적어 둔 내용
  *   date = 이 내용을 기록할 날 (위 '기록 날짜'), touched = 마지막으로 만진 날 (오늘이 아니면 '지난 날 내용 남아 있음')
- *   a = 평일 7:00–8:30, b = 평일 9:30–11:00, rows = 주말 [시작, 끝, 내용] × 4, review = 아침 복습
- * state.studies = { 'YYYY-MM-DD': { mode, review, a, b, rows, min, at } }   그날 기록 (min = 공부한 분)
+ *   rows = [시작, 끝, 내용] 줄 (평일·주말 같음, 4줄부터 다 쓰면 한 줄씩 늘어남), review = 아침 복습
+ * state.studies = { 'YYYY-MM-DD': { mode, review, rows, min, at } }   그날 기록 (min = 공부한 분)
+ *   예전 평일 기록은 rows 대신 a(7:00–8:30) · b(9:30–11:00) 글자로 남아 있다 → 그대로 읽는다.
+ * 평일 계획(7:00–8:30 · 9:30–11:00)은 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
+ * (일정이 틀어진 날도 실제로 공부한 시간을 그대로 적게). 계획을 지켰는지는 적은 시간이 계획과 절반 이상 겹치는지로 본다.
  * 평일·주말은 요일로 정하고, 쉬는 평일은 공부 탭 위에서 '주말'로 바꾼다 (운동 탭의 8:30–9:30 루틴도 따라 숨김). */
 
 const STUDY_BLOCKS = [
-  { id: 'a', time: '7:00–8:30', min: 90, ph: '예: 기출 코딩 문제 10개 (틀린 것: 포인터 2개)' },
-  { id: 'b', time: '9:30–11:00', min: 90, ph: '예: 데이터베이스 이론 훑기 + 단답형 30문제 (24/30)' },
+  { id: 'a', time: '7:00–8:30', s: '07:00', e: '08:30', min: 90 },
+  { id: 'b', time: '9:30–11:00', s: '09:30', e: '11:00', min: 90 },
 ];
-const WEEKEND_ROWS = 4;
+const ROWS_MIN = 4; // 처음 보이는 줄 수
+const ROWS_MAX = 8; // 다 쓰면 한 줄씩 늘어나는 끝
 const EXAM_DAYS = 120; // 공부 탭 위에 D-day로 보여 줄 공적 일정 범위
 
 /* 평일·주말: 기본은 요일(토·일 = 주말). 다르게 고른 날만 state.daymode에 남긴다 */
@@ -25,31 +29,35 @@ function setDayMode(k, mode) {
 }
 
 const stOf = () => state.study || {};
-const stRows = (s) => Array.from({ length: WEEKEND_ROWS }, (_, i) => ({ s: '', e: '', t: '', ...((s.rows || [])[i] || {}) }));
+const stRows = (s, n) => Array.from({ length: n || Math.min(ROWS_MAX, Math.max(ROWS_MIN, (s.rows || []).length)) },
+  (_, i) => ({ s: '', e: '', t: '', ...((s.rows || [])[i] || {}) }));
 const toMin = (hm) => { const [h, m] = (hm || '').split(':').map(Number); return h * 60 + m; };
 const fmtMin = (n) => (n < 60 ? `${n}분` : `${Math.floor(n / 60)}시간${n % 60 ? ` ${n % 60}분` : ''}`);
 const rowMin = (r) => (r.s && r.e && toMin(r.e) > toMin(r.s) ? toMin(r.e) - toMin(r.s) : 0);
+const hm = (t) => t.replace(/^0(?=\d)/, ''); // 07:00 → 7:00
 
-/* 지금 적어 둔 내용 → 기록 (그날 모드의 칸만) */
+/* 평일 계획 칸과 겹친 시간 (분). 절반 이상 겹치면 그 칸을 지킨 것으로 본다 */
+const blockMin = (rows, b) => rows.reduce((a, r) => (rowMin(r)
+  ? a + Math.max(0, Math.min(toMin(r.e), toMin(b.e)) - Math.max(toMin(r.s), toMin(b.s))) : a), 0);
+const blockDone = (rec, b) => !!rec && (!!rec[b.id] || blockMin(rec.rows || [], b) >= b.min / 2);
+
+/* 기록 한 날을 글로 (리포트용). 예전 평일 기록(a·b)도 읽는다 */
+const studyParts = (rec) => [
+  ...STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => `${b.time.split('–')[0]} ${rec[b.id]}`),
+  ...(rec.rows || []).map((r) => `${r.s && r.e ? `${hm(r.s)}–${hm(r.e)} ` : r.s ? `${hm(r.s)}– ` : ''}${r.t}`.trim()),
+];
+
+/* 지금 적어 둔 내용 → 기록 (내용이나 시간이 있는 줄만) */
 function studySnapshot(s, mode) {
-  const rec = { mode, review: s.review ? 1 : 0 };
-  if (mode === 'weekday') {
-    let min = 0;
-    for (const b of STUDY_BLOCKS) {
-      rec[b.id] = (s[b.id] || '').trim();
-      if (rec[b.id]) min += b.min;
-    }
-    rec.min = min;
-  } else {
-    rec.rows = stRows(s).filter((r) => r.t.trim() || rowMin(r)).map((r) => ({ s: r.s, e: r.e, t: r.t.trim() }));
-    rec.min = rec.rows.reduce((a, r) => a + rowMin(r), 0);
-  }
-  return rec;
+  const rows = stRows(s).filter((r) => r.t.trim() || rowMin(r)).map((r) => ({ s: r.s, e: r.e, t: r.t.trim() }));
+  return { mode, review: s.review ? 1 : 0, rows, min: rows.reduce((a, r) => a + rowMin(r), 0) };
 }
 const studyHasContent = (rec) => !!(rec.review || rec.min || rec.a || rec.b || (rec.rows && rec.rows.length));
-const sameStudy = (a, b) => !!a && !!b && JSON.stringify({ ...a, at: 0 }) === JSON.stringify({ ...b, at: 0 });
-/* 칸에 뭐라도 적혀 있는지 (시간만 고른 주말 줄 포함) */
-const studyAny = (s) => !!(s.review || ['a', 'b'].some((f) => (s[f] || '').trim()) || stRows(s).some((r) => r.t || r.s || r.e));
+/* 같은 내용인지 (예전 형식 기록은 줄로 바꿔서 비교) */
+const studyKey = (r) => JSON.stringify(studySnapshot(recordToStudy(r), r.mode));
+const sameStudy = (a, b) => !!a && !!b && studyKey(a) === studyKey(b);
+/* 칸에 뭐라도 적혀 있는지 (시간만 고른 줄 포함) */
+const studyAny = (s) => !!(s.review || stRows(s).some((r) => r.t || r.s || r.e));
 
 /* 기록 날짜와 '지난 날 내용이 남아 있음' (운동 탭과 같은 방식) */
 const stTouched = () => stOf().touched || stOf().date;
@@ -61,10 +69,25 @@ function stRecDate() {
 }
 const stSnap = () => studySnapshot(stOf(), dayMode(stRecDate()));
 
-/* 남겨 둔 기록 → 칸 (지난 날 기록을 불러와 고칠 때) */
+/* 남겨 둔 기록 → 칸 (지난 날 기록을 불러와 고칠 때). 예전 평일 기록의 a·b는 계획 시간 줄로 */
 function recordToStudy(rec) {
-  return { review: rec.review || 0, a: rec.a || '', b: rec.b || '', rows: (rec.rows || []).map((r) => ({ ...r })) };
+  const old = STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => ({ s: b.s, e: b.e, t: rec[b.id] }));
+  return { review: rec.review || 0, rows: [...old, ...(rec.rows || []).map((r) => ({ ...r }))] };
 }
+
+/* 보여 줄 줄: 적어 둔 마지막 줄 다음에 빈 줄 하나 (4줄부터 8줄까지) */
+function stShown(s) {
+  const rows = stRows(s);
+  const last = rows.reduce((a, r, i) => (r.s || r.e || r.t ? i : a), -1);
+  return stRows(s, Math.min(ROWS_MAX, Math.max(ROWS_MIN, last + 2)));
+}
+const rowHtml = (r, i, ro) => `<div class="st-row" data-i="${i}">
+  <input type="time" class="st-time" data-f="s" value="${r.s}" aria-label="${i + 1}번째 시작 시간"${ro}>
+  <span class="st-tilde">~</span>
+  <input type="time" class="st-time" data-f="e" value="${r.e}" aria-label="${i + 1}번째 끝 시간"${ro}>
+  <input type="text" class="st-row-text" data-f="t" maxlength="200" value="${esc(r.t)}" placeholder="${i ? '공부한 내용' : '공부한 내용 (예: 기출 코딩 10문제, 틀린 것 2)'}" aria-label="${i + 1}번째 공부한 내용"${ro}>
+</div>`;
+const planHtml = (rows) => `<div class="st-plan"><span>계획</span>${STUDY_BLOCKS.map((b) => `<button class="st-chip" data-plan="${b.id}" aria-pressed="${blockMin(rows, b) >= b.min / 2}">${b.time}</button>`).join('')}</div>`;
 
 function renderStudy() {
   const s = stOf();
@@ -98,28 +121,19 @@ function renderStudy() {
     </div>`
     : rec ? `<div class="wo-banner done"><b>${k === today ? '오늘' : md(k)} 공부를 기록했어요</b><span>${rec.min ? fmtMin(rec.min) : '시간 없음'}${rec.review ? ' · 아침 복습 ✓' : ''}</span></div>` : '';
 
-  const rows = stRows(s);
+  const rows = stShown(s);
   const ro = stale ? ' readonly' : '';
   $('st-body').innerHTML = `
     <button class="rt-item st-review${s.review ? ' on' : ''}" id="st-review" aria-pressed="${!!s.review}">
       <span class="check">${CHECK_SVG}</span>
       <span class="rt-text"><span class="rt-label">아침 복습 15분</span><span class="rt-sub">어제 헷갈린 것 5–10개, 답을 보기 전에 먼저 떠올려 보기</span></span>
     </button>
-    ${mode === 'weekday' ? STUDY_BLOCKS.map((b) => `
-      <section class="wo-card st-block">
-        <div class="wo-head"><span class="wo-name">${b.time}</span><span class="wo-target">${fmtMin(b.min)}</span></div>
-        <textarea class="st-text" data-f="${b.id}" rows="2" maxlength="300" placeholder="${b.ph}"${ro}>${esc(s[b.id] || '')}</textarea>
-      </section>`).join('') : `
-      <section class="wo-card">
-        <div class="wo-head"><span class="wo-name">주말 공부</span><span class="wo-target">시간 고르고 내용 적기</span>
-          <span class="wo-amt" id="st-total">${fmtMin(rows.reduce((a, r) => a + rowMin(r), 0))}</span></div>
-        ${rows.map((r, i) => `<div class="st-row" data-i="${i}">
-          <input type="time" class="st-time" data-f="s" value="${r.s}" aria-label="${i + 1}번째 시작 시간"${ro}>
-          <span class="st-tilde">~</span>
-          <input type="time" class="st-time" data-f="e" value="${r.e}" aria-label="${i + 1}번째 끝 시간"${ro}>
-          <input type="text" class="st-row-text" data-f="t" maxlength="200" value="${esc(r.t)}" placeholder="공부한 내용" aria-label="${i + 1}번째 공부한 내용"${ro}>
-        </div>`).join('')}
-      </section>`}`;
+    <section class="wo-card">
+      <div class="wo-head"><span class="wo-name">${mode === 'weekday' ? '평일 공부' : '주말 공부'}</span><span class="wo-target">시간 고르고 내용 적기</span>
+        <span class="wo-amt" id="st-total">${fmtMin(rows.reduce((a, r) => a + rowMin(r), 0))}</span></div>
+      ${mode === 'weekday' ? planHtml(rows) : ''}
+      <div id="st-rows">${rows.map((r, i) => rowHtml(r, i, ro)).join('')}</div>
+    </section>`;
 
   $('st-done').textContent = k === today ? (rec ? '완료 기록 고치기' : '오늘 공부 완료') : `${ml(k)} ${rec ? '기록 고치기' : '공부 완료'}`;
 }
@@ -141,23 +155,45 @@ $('st-mode').addEventListener('click', (e) => {
 });
 
 $('st-body').addEventListener('click', (e) => {
-  if (!e.target.closest('#st-review') || stStale()) return;
-  editStudy({ review: stOf().review ? 0 : 1 });
+  if (stStale()) return;
+  if (e.target.closest('#st-review')) {
+    editStudy({ review: stOf().review ? 0 : 1 });
+    renderStudy();
+    return;
+  }
+  // 계획 버튼: 계획대로 했으면 눌러서 빈 줄에 그 시간을 채운다
+  const chip = e.target.closest('[data-plan]');
+  if (!chip) return;
+  const b = STUDY_BLOCKS.find((x) => x.id === chip.dataset.plan);
+  const rows = stRows(stOf(), document.querySelectorAll('#st-rows .st-row').length);
+  if (chip.getAttribute('aria-pressed') === 'true') { toast(`${b.time} 시간은 이미 적었어요`); return; }
+  const i = rows.findIndex((r) => !r.s && !r.e);
+  if (i < 0) { toast('빈 줄이 없어요'); return; }
+  rows[i] = { ...rows[i], s: b.s, e: b.e };
+  editStudy({ rows });
   renderStudy();
+  const t = document.querySelector(`#st-rows .st-row[data-i="${i}"] .st-row-text`);
+  if (t && !t.value) t.focus();
 });
 
-// 글자를 칠 때마다 저장 (다시 그리지 않아 입력이 끊기지 않게)
+// 글자를 칠 때마다 저장 (다시 그리지 않아 입력이 끊기지 않게: 합계·계획 표시·새 줄만 고친다)
 $('st-body').addEventListener('input', (e) => {
   const f = e.target.dataset.f;
-  if (!f || stStale()) return;
-  if (e.target.classList.contains('st-text')) { editStudy({ [f]: e.target.value }); return; }
   const row = e.target.closest('.st-row');
-  if (!row) return;
-  const rows = stRows(stOf());
-  rows[+row.dataset.i][f] = e.target.value;
+  if (!f || !row || stStale()) return;
+  const box = $('st-rows');
+  const n = box.children.length;
+  const rows = stRows(stOf(), n);
+  const i = +row.dataset.i;
+  rows[i][f] = e.target.value;
   editStudy({ rows });
-  const t = $('st-total');
-  if (t) t.textContent = fmtMin(rows.reduce((a, r) => a + rowMin(r), 0));
+  $('st-total').textContent = fmtMin(rows.reduce((a, r) => a + rowMin(r), 0));
+  for (const c of document.querySelectorAll('#st-body [data-plan]')) {
+    const b = STUDY_BLOCKS.find((x) => x.id === c.dataset.plan);
+    c.setAttribute('aria-pressed', String(blockMin(rows, b) >= b.min / 2));
+  }
+  // 마지막 줄을 쓰기 시작하면 빈 줄을 하나 더
+  if (i === n - 1 && n < ROWS_MAX && (rows[i].s || rows[i].e || rows[i].t)) box.insertAdjacentHTML('beforeend', rowHtml({ s: '', e: '', t: '' }, n, ''));
 });
 
 /* 기록은 기록 날짜로 남긴다 */

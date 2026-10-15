@@ -1005,18 +1005,19 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .st-exam { padding: 4px 10px; border-radius: 999px; background: var(--c-work-soft); font-size: 13px; color: var(--text); }
 .st-exam b { font-variant-numeric: tabular-nums; margin-right: 2px; }
 .st-review { margin-bottom: 10px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); }
-.st-text {
-  width: 100%;
-  padding: 10px 12px;
+.st-plan { display: flex; align-items: center; gap: 6px; margin: -2px 0 12px; font-size: 13px; color: var(--text-2); }
+.st-plan > span { margin-right: 2px; }
+.st-chip {
+  padding: 5px 11px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 16px;
-  line-height: 1.5;
-  resize: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
+.st-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.st-chip[aria-pressed="true"]::before { content: '✓ '; }
 .st-row { display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: center; gap: 4px 4px; }
 .st-row + .st-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .st-row-text { grid-column: 1 / -1; }
@@ -1039,7 +1040,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .r-week ul { padding: 0 12px 10px !important; gap: 6px !important; }
 .r-week li { padding-left: 0 !important; font-size: 14px !important; line-height: 1.5 !important; color: var(--text-2); }
 .r-week li::before { content: none !important; }
-.st-text:focus, .st-row-text:focus, .st-time:focus, .cond-memo:focus, .cond-w:focus { outline: none; border-color: var(--accent); }
+.st-row-text:focus, .st-time:focus, .cond-memo:focus, .cond-w:focus { outline: none; border-color: var(--accent); }
 .cond-th { padding: 4px 12px 8px; min-height: 44px; }
 .cond-th .check { width: 22px; height: 22px; }
 .cond-th.on .check { background: var(--c-care); border-color: var(--c-care); }
@@ -1071,4 +1072,4 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .stale-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
 .stale-acts .wo-btn { height: 40px; font-size: 13px; }
 .stale-acts .wo-btn.primary { grid-column: 1 / -1; }
-.locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-text, .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }
+.locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-chip, .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }

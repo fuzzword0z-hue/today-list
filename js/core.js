@@ -42,6 +42,16 @@ function normalize(s) {
   s.workout = obj(s.workout) && obj(s.workout.c) ? s.workout : { date: null, c: {} };
   s.studies = obj(s.studies) ? s.studies : {};
   s.study = obj(s.study) ? s.study : { date: null };
+  // 예전 평일 칸(a = 7:00–8:30, b = 9:30–11:00)에 적어 둔 내용은 시간 줄로 옮긴다
+  if ('a' in s.study || 'b' in s.study) {
+    const old = [['a', '07:00', '08:30'], ['b', '09:30', '11:00']]
+      .filter(([f]) => typeof s.study[f] === 'string' && s.study[f].trim())
+      .map(([f, from, to]) => ({ s: from, e: to, t: s.study[f].trim() }));
+    const rows = Array.isArray(s.study.rows) ? s.study.rows.filter((r) => r && (r.s || r.e || r.t)) : [];
+    s.study.rows = [...old, ...rows];
+    delete s.study.a;
+    delete s.study.b;
+  }
   s.daymode = obj(s.daymode) ? s.daymode : {};
   if (s.dismissed === undefined) s.dismissed = null;
   return s;

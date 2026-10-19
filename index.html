@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
   <title>오늘</title>
 </head>
 <body>
@@ -90,6 +90,7 @@
       </header>
       <main class="scroll">
         <div class="care" id="care"></div>
+        <div class="off-bar" id="off-bar"></div>
         <div class="month" id="month"></div>
         <div class="cal-legend" id="cal-legend"></div>
         <div class="day-panel" id="day-panel"></div>
@@ -161,7 +162,14 @@
     <!-- ───────── 운동 ───────── -->
     <section class="view" id="view-workout" hidden>
       <header class="top">
-        <div class="top-row"><span class="date-sub is-today" id="wo-date"></span></div>
+        <div class="top-row">
+          <span class="date-sub is-today" id="wo-date"></span>
+          <span class="spacer"></span>
+          <div class="mini-seg" id="wo-mode" role="radiogroup" aria-label="출근일·쉬는 날">
+            <button role="radio" data-mode="weekday">출근일</button>
+            <button role="radio" data-mode="weekend">쉬는 날</button>
+          </div>
+        </div>
         <div class="top-row">
           <h1 class="date-main">운동</h1>
           <span class="spacer"></span>
@@ -187,9 +195,9 @@
         <div class="top-row">
           <span class="date-sub is-today" id="st-date"></span>
           <span class="spacer"></span>
-          <div class="mini-seg" id="st-mode" role="radiogroup" aria-label="평일·주말">
-            <button role="radio" data-mode="weekday">평일</button>
-            <button role="radio" data-mode="weekend">주말</button>
+          <div class="mini-seg" id="st-mode" role="radiogroup" aria-label="출근일·쉬는 날">
+            <button role="radio" data-mode="weekday">출근일</button>
+            <button role="radio" data-mode="weekend">쉬는 날</button>
           </div>
         </div>
         <div class="top-row"><h1 class="date-main">공부</h1></div>
@@ -199,7 +207,7 @@
         <div id="st-recdate"></div>
         <div id="st-status"></div>
         <div id="st-body"></div>
-        <p class="wo-note">쉬는 평일엔 위에서 '주말'로 바꾸면 주말 칸이 나오고, 운동 탭의 8:30–9:30 루틴도 숨겨져요.<br>완료 기록은 월간·연간 리포트에만 반영돼요.</p>
+        <p class="wo-note">휴무·연차인 날은 위에서 '쉬는 날'로 바꾸거나, 캘린더의 '쉬는 날 고르기'에서 근무표대로 한 번에 골라요. 운동 탭도 같이 바뀌어요.<br>완료 기록은 월간·연간 리포트에만 반영돼요.</p>
       </main>
       <div class="wo-actions">
         <button class="wo-btn" id="st-reset">전체 지우기</button>
@@ -322,17 +330,17 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=16"></script>
-  <script src="js/events.js?v=16"></script>
-  <script src="js/today.js?v=16"></script>
-  <script src="js/calendar.js?v=16"></script>
-  <script src="js/stats.js?v=16"></script>
-  <script src="js/report.js?v=16"></script>
-  <script src="js/care.js?v=16"></script>
-  <script src="js/workout.js?v=16"></script>
-  <script src="js/study.js?v=16"></script>
-  <script src="js/health.js?v=16"></script>
-  <script src="js/backup.js?v=16"></script>
-  <script src="js/main.js?v=16"></script>
+  <script src="js/core.js?v=17"></script>
+  <script src="js/events.js?v=17"></script>
+  <script src="js/today.js?v=17"></script>
+  <script src="js/calendar.js?v=17"></script>
+  <script src="js/stats.js?v=17"></script>
+  <script src="js/report.js?v=17"></script>
+  <script src="js/care.js?v=17"></script>
+  <script src="js/workout.js?v=17"></script>
+  <script src="js/study.js?v=17"></script>
+  <script src="js/health.js?v=17"></script>
+  <script src="js/backup.js?v=17"></script>
+  <script src="js/main.js?v=17"></script>
 </body>
 </html>

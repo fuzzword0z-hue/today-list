@@ -4,12 +4,15 @@
  * 운동 탭처럼 페이지 하나를 매일 다시 쓴다. '오늘 공부 완료'로 남긴 기록은 리포트에만 쓴다.
  * state.study   = { date, touched, review, rows: [{ s, e, t }] }   지금 적어 둔 내용
  *   date = 이 내용을 기록할 날 (위 '기록 날짜'), touched = 마지막으로 만진 날 (오늘이 아니면 '지난 날 내용 남아 있음')
- *   rows = [시작, 끝, 내용] 줄 (평일·주말 같음, 4줄부터 다 쓰면 한 줄씩 늘어남), review = 아침 복습
+ *   rows = [시작, 끝, 내용] 줄 (출근일·쉬는 날 같음, 4줄부터 다 쓰면 한 줄씩 늘어남), review = 아침 복습
  * state.studies = { 'YYYY-MM-DD': { mode, review, rows, min, at } }   그날 기록 (min = 공부한 분)
  *   예전 평일 기록은 rows 대신 a(7:00–8:30) · b(9:30–11:00) 글자로 남아 있다 → 그대로 읽는다.
- * 평일 계획(7:00–8:30 · 9:30–11:00)은 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
+ * 출근일 계획(7:00–8:30 · 9:30–11:00)은 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
  * (일정이 틀어진 날도 실제로 공부한 시간을 그대로 적게). 계획을 지켰는지는 적은 시간이 계획과 절반 이상 겹치는지로 본다.
- * 평일·주말은 요일로 정하고, 쉬는 평일은 공부 탭 위에서 '주말'로 바꾼다 (운동 탭의 8:30–9:30 루틴도 따라 숨김). */
+ * 출근일·쉬는 날 (안의 값은 예전 이름 그대로 'weekday' · 'weekend'):
+ *   기본은 '매주 쉬는 요일'(state.offDays, 처음엔 월요일 — 박물관 휴관일). 토·일은 번갈아 출근하므로 기본은 출근일.
+ *   스케줄 휴무·연차·공휴일 다음 날 휴관은 캘린더의 '쉬는 날 고르기'나 운동·공부 탭 위 토글로 그날만 바꾼다
+ *   (state.daymode). 쉬는 날엔 운동 탭의 8:30–9:30 루틴이 숨겨지고, 리포트의 '출근일 루틴'에서 빠진다. */
 
 const STUDY_BLOCKS = [
   { id: 'a', time: '7:00–8:30', s: '07:00', e: '08:30', min: 90 },
@@ -19,8 +22,9 @@ const ROWS_MIN = 4; // 처음 보이는 줄 수
 const ROWS_MAX = 8; // 다 쓰면 한 줄씩 늘어나는 끝
 const EXAM_DAYS = 120; // 공부 탭 위에 D-day로 보여 줄 공적 일정 범위
 
-/* 평일·주말: 기본은 요일(토·일 = 주말). 다르게 고른 날만 state.daymode에 남긴다 */
-const defaultMode = (k) => ([0, 6].includes(parse(k).getDay()) ? 'weekend' : 'weekday');
+/* 출근일(weekday) · 쉬는 날(weekend): 기본은 매주 쉬는 요일. 다르게 고른 날만 state.daymode에 남긴다 */
+const offDays = () => (Array.isArray(state.offDays) ? state.offDays : [1]); // 0 = 일요일
+const defaultMode = (k) => (offDays().includes(parse(k).getDay()) ? 'weekend' : 'weekday');
 const dayMode = (k) => state.daymode[k] || defaultMode(k);
 function setDayMode(k, mode) {
   if (mode === defaultMode(k)) delete state.daymode[k];
@@ -124,7 +128,7 @@ function renderStudy() {
       <span class="rt-text"><span class="rt-label">아침 복습 15분</span><span class="rt-sub">어제 헷갈린 것 5–10개, 답을 보기 전에 먼저 떠올려 보기</span></span>
     </button>
     <section class="wo-card">
-      <div class="wo-head"><span class="wo-name">${mode === 'weekday' ? '평일 공부' : '주말 공부'}</span><span class="wo-target">시간 고르고 내용 적기</span>
+      <div class="wo-head"><span class="wo-name">${mode === 'weekday' ? '출근일 공부' : '쉬는 날 공부'}</span><span class="wo-target">시간 고르고 내용 적기</span>
         <span class="wo-amt" id="st-total">${fmtMin(rows.reduce((a, r) => a + rowMin(r), 0))}</span></div>
       ${mode === 'weekday' ? planHtml(rows) : ''}
       <div id="st-rows">${rows.map((r, i) => rowHtml(r, i, ro)).join('')}</div>

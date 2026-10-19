@@ -35,14 +35,17 @@ function countOf(s) {
 }
 
 /* ───────── 내보내기 ───────── */
-$('export-btn').addEventListener('click', async () => {
+// 아이폰 홈 화면 앱은 '파일로 저장'(다운로드)이 조용히 안 될 때가 있어서 공유 시트로 보낸다 (공유 시트에 '파일에 저장'이 있음)
+const iosApp = navigator.standalone === true;
+$('export-btn').addEventListener('click', () => exportBackup());
+async function exportBackup() {
   const file = new File(
     [JSON.stringify({ app: BACKUP_APP, v: state.v, exportedAt: new Date().toISOString(), data: state }, null, 1)],
     `today-backup-${today}.json`,
     { type: 'application/json' },
   );
   const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
-  const how = canShare
+  const how = canShare && iosApp ? 'share' : canShare
     ? await choose('백업 파일을 어떻게 저장할까요?', [
       { label: '휴대폰에 파일로 저장', value: 'download' },
       { label: '다른 앱으로 보내기 (드라이브·카톡 등)', value: 'share' },
@@ -71,8 +74,13 @@ $('export-btn').addEventListener('click', async () => {
   state.lastExport = Date.now();
   save();
   renderBackup();
-  toast(how === 'share' ? '백업 파일을 보냈어요' : `${file.name} 파일로 저장했어요`);
-});
+  toast(how === 'share' ? '백업 파일을 보냈어요' : iosApp
+    ? `${file.name} 저장을 요청했어요. 파일 앱에 없으면 Safari에서 열어 다시 내보내 주세요.`
+    : `${file.name} 파일로 저장했어요`);
+}
+
+$('crash-export').addEventListener('click', () => exportBackup());
+$('crash-reload').addEventListener('click', () => location.reload());
 
 /* ───────── 불러오기 ───────── */
 // accept를 지정하면 아이폰에서 .json 파일이 회색으로 막히는 경우가 있어, 아무 파일이나 고르게 하고 내용으로 확인한다

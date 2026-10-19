@@ -81,12 +81,7 @@ function stShown(s) {
   const last = rows.reduce((a, r, i) => (r.s || r.e || r.t ? i : a), -1);
   return stRows(s, Math.min(ROWS_MAX, Math.max(ROWS_MIN, last + 2)));
 }
-const rowHtml = (r, i, ro) => `<div class="st-row" data-i="${i}">
-  <input type="time" class="st-time" data-f="s" value="${r.s}" aria-label="${i + 1}번째 시작 시간"${ro}>
-  <span class="st-tilde">~</span>
-  <input type="time" class="st-time" data-f="e" value="${r.e}" aria-label="${i + 1}번째 끝 시간"${ro}>
-  <input type="text" class="st-row-text" data-f="t" maxlength="200" value="${esc(r.t)}" placeholder="${i ? '공부한 내용' : '공부한 내용 (예: 기출 코딩 10문제, 틀린 것 2)'}" aria-label="${i + 1}번째 공부한 내용"${ro}>
-</div>`;
+const rowHtml = (r, i, ro) => timeRowHtml(r, i, ro, i ? '공부한 내용' : '공부한 내용 (예: 기출 10문제, 틀린 것 2)');
 const planHtml = (rows) => `<div class="st-plan"><span>계획</span>${STUDY_BLOCKS.map((b) => `<button class="st-chip" data-plan="${b.id}" aria-pressed="${blockMin(rows, b) >= b.min / 2}">${b.time}</button>`).join('')}</div>`;
 
 function renderStudy() {
@@ -95,7 +90,7 @@ function renderStudy() {
   const mode = dayMode(k);
   const rec = state.studies[k];
   const stale = stStale();
-  $('st-date').textContent = mdw(today);
+  $('st-date').textContent = `${mdw(k)}${k === today ? '' : ' 기록'}`; // 지난 날을 고쳐 쓰는 중이면 그 날
   for (const b of $('st-mode').children) b.setAttribute('aria-checked', String(b.dataset.mode === mode));
   $('view-study').classList.toggle('locked', stale);
   $('st-recdate').innerHTML = stale ? '' : recDateRow(k);
@@ -135,16 +130,17 @@ function renderStudy() {
       <div id="st-rows">${rows.map((r, i) => rowHtml(r, i, ro)).join('')}</div>
     </section>`;
 
+  growAll($('st-body'));
   $('st-done').textContent = k === today ? (rec ? '완료 기록 고치기' : '오늘 공부 완료') : `${ml(k)} ${rec ? '기록 고치기' : '공부 완료'}`;
 }
 
-function editStudy(patch) {
+function editStudy(patch, typing = false) {
   if (stStale()) return;
   const s = { ...stOf(), ...patch };
   s.date = stRecDate();
   s.touched = today;
   state.study = s;
-  save();
+  if (typing) saveSoon(); else save();
 }
 
 $('st-mode').addEventListener('click', (e) => {
@@ -186,7 +182,7 @@ $('st-body').addEventListener('input', (e) => {
   const rows = stRows(stOf(), n);
   const i = +row.dataset.i;
   rows[i][f] = e.target.value;
-  editStudy({ rows });
+  editStudy({ rows }, true);
   $('st-total').textContent = fmtMin(rows.reduce((a, r) => a + rowMin(r), 0));
   for (const c of document.querySelectorAll('#st-body [data-plan]')) {
     const b = STUDY_BLOCKS.find((x) => x.id === c.dataset.plan);

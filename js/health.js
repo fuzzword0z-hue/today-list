@@ -166,7 +166,7 @@ function healthBody(k, lf, gap) {
   return `<div class="cond-body h-body">
     ${lf && gap < goal.food ? `<p class="h-note">주의 음식은 ${ml(addDays(lf, goal.food))}부터 괜찮아요 (${goal.food}일에 한 번)</p>` : ''}
     <div class="cond-row"><span class="cond-label">체중</span>
-      <input class="cond-w" id="h-w" type="number" inputmode="decimal" step="0.1" min="20" max="200" placeholder="0.0" value="${w || ''}"><span class="cond-unit">kg</span>
+      <input class="cond-w" id="h-w" aria-label="내 체중" type="number" inputmode="decimal" step="0.1" min="20" max="200" placeholder="0.0" value="${w || ''}"><span class="cond-unit">kg</span>
       ${pw ? `<span class="cond-prev">지난 ${state.weights[pw]}kg (${ml(pw)})</span>` : '<span class="cond-prev">잴 수 있는 날에만</span>'}
     </div>
 
@@ -351,7 +351,12 @@ function analyzeHealth(start, last, end) {
     lateSnack: 0, foodGaps: [], foodEarly: [],
     weights: Object.keys(state.weights).filter((d) => d >= start && d <= end).sort(),
     labs: labKeys().filter((d) => d >= start && d <= end),
+    sq: { days: 0, sum: 0 }, // 식후 스쿼트 (운동 탭 기록) — 혈당 관리로 함께 본다
   };
+  for (const d in state.workouts) {
+    const r = state.workouts[d];
+    if (d >= start && d <= last && r.sq) { hl.sq.days++; hl.sq.sum += r.sq; }
+  }
   const from = state.hstart && state.hstart > start ? state.hstart : start;
   if (!state.hstart || !Object.keys(state.health).length || from > last) return hl;
   hl.on = true;
@@ -448,7 +453,7 @@ function healthFeedback(hl) {
 
 /* 리포트의 '건강' 칸: [html, 텍스트 줄] */
 function healthSection(hl, yearly) {
-  if (!hl.on && !hl.weights.length && !hl.labs.length) return ['', []];
+  if (!hl.on && !hl.weights.length && !hl.labs.length && !hl.sq.days) return ['', []];
   const g = hGoal();
   const n = hl.weeks.length;
   const tiles = [];
@@ -460,6 +465,7 @@ function healthSection(hl, yearly) {
     tiles.push(['주의 음식', `${hl.food}<small>번</small>`, hl.foodEarly.length ? `<small>${g.food}일 안에 다시 ${hl.foodEarly.length}번</small>`
       : hl.foodGaps.length ? `<small>가장 짧은 간격 ${Math.min(...hl.foodGaps)}일</small>` : '']);
   }
+  if (hl.sq.days) tiles.push(['식후 스쿼트', `${hl.sq.days}<small>일</small>`, `<small>평균 ${Math.round(hl.sq.sum / hl.sq.days)}회</small>`]);
   if (hl.weights.length) {
     const lastW = hl.weights[hl.weights.length - 1];
     const base = weightBefore(hl.weights[0]) || (hl.weights.length > 1 ? hl.weights[0] : null);

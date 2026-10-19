@@ -69,7 +69,7 @@ function row(t) {
   if (t.m) meta = `→ ${md(t.m)}`;
   else if (t.f && !t.d) meta = `${md(t.f)}에서`;
   return `<li class="${cls.join(' ')}" data-id="${t.id}" tabindex="0" role="checkbox" aria-checked="${t.d ? 'true' : 'false'}">
-    <div class="task-bg"><span class="bg-left">내일로</span><span class="bg-right">삭제</span></div>
+    <div class="task-bg"><span class="bg-left">${ui.date < today ? '오늘로' : '내일로'}</span><span class="bg-right">삭제</span></div>
     <div class="task-fg"><span class="check">${CHECK_SVG}</span><span class="text">${esc(t.t)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</div>
   </li>`;
 }
@@ -147,8 +147,9 @@ function remove(id) {
 function defer(id) {
   const t = findTask(id);
   if (!t || t.d || t.m) return;
-  const next = addDays(ui.date, 1);
-  undoable(`${md(next)}로 미뤘어요`, () => {
+  // 지난 날의 할 일은 다음 날(여전히 지난 날)이 아니라 오늘로
+  const next = ui.date < today ? today : addDays(ui.date, 1);
+  undoable(`${next === today ? '오늘' : md(next)}로 미뤘어요`, () => {
     t.m = next;
     dayItems(next).push({ id: uid(), t: t.t, d: 0, f: ui.date });
   });
@@ -191,7 +192,7 @@ function focusField(field) {
   field.setSelectionRange(field.value.length, field.value.length);
 }
 
-/* 제스처: 탭 = 완료, 길게 누르기 = 수정, ← 밀기 = 삭제, → 밀기 = 내일로 */
+/* 제스처: 탭 = 완료, 길게 누르기 = 수정, ← 밀기 = 삭제, → 밀기 = 내일로 (지난 날이면 오늘로) */
 const list = $('list');
 let g = null;
 const SWIPE = 90;

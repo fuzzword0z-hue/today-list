@@ -18,7 +18,7 @@
  *   study, studies                    공부 탭에 적어 둔 내용과 '오늘 공부 완료' 기록 (js/study.js)
  *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   요일과 다르게 고른 날 (쉬는 평일 등)
  *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
- * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 먹임·안 감)이 더 붙는다.
+ * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
  */
 const STORE = 'today-list:v1';
@@ -63,6 +63,8 @@ function normalize(s) {
 }
 
 function save() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
   for (const k in state.days) if (!state.days[k].length) delete state.days[k];
   try {
     localStorage.setItem(STORE, JSON.stringify(state));
@@ -70,6 +72,29 @@ function save() {
     toast('저장하지 못했어요. 저장 공간을 확인해 주세요.');
   }
 }
+
+/* 글자를 칠 때는 잠깐 멈췄을 때 한 번만 저장한다 (기록이 쌓이면 저장이 느려지므로).
+ * 칸을 벗어나거나 앱을 내리면 바로 저장. */
+let saveTimer = null;
+function saveSoon() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 400);
+}
+const flushSave = () => { if (saveTimer) save(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('focusout', flushSave);
+
+/* 다른 창(홈 화면 앱과 브라우저 탭 등)에서 바꾼 기록을 받아 와서 다시 그린다 (나중에 저장한 쪽이 덮어쓰지 않게) */
+window.addEventListener('storage', (e) => {
+  if (e.key !== STORE || !e.newValue) return;
+  try {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    state = normalize(JSON.parse(e.newValue));
+    render();
+  } catch (err) { /* 읽을 수 없으면 무시 */ }
+});
 
 /* 되돌릴 수 있는 변경.
  * 실행 취소는 '이 변경으로 바뀐 곳'만 되돌린다. 토스트가 떠 있는 사이 다른 할 일을 체크하거나
@@ -206,7 +231,19 @@ function go(view, { push = false, id = '' } = {}) {
   if (sc) sc.scrollTop = 0;
 }
 
+/* 화면을 그리다 오류가 나도 기록을 꺼낼 수 있게: 안전 화면 (기록 내보내기 · 다시 열기) */
 function render() {
+  try {
+    renderView();
+    $('crash').hidden = true;
+  } catch (err) {
+    $('crash-msg').textContent = String((err && err.message) || err).slice(0, 200);
+    $('crash').hidden = false;
+    console.error(err);
+  }
+}
+
+function renderView() {
   const r = route();
   const app = $('app');
   if (app.dataset.view !== r.view) hideToast();
@@ -261,8 +298,12 @@ function choose(title, options) {
     const done = (v) => {
       wrap.hidden = true;
       wrap.onclick = null;
+      wrap.onkeydown = null;
       resolve(v);
     };
+    // Esc로 닫기, 키보드로 바로 고를 수 있게 첫 버튼에 포커스
+    wrap.onkeydown = (e) => { if (e.key === 'Escape') done(null); };
+    setTimeout(() => { const b = $('choice-opts').querySelector('button'); if (b && !wrap.hidden) b.focus({ preventScroll: true }); }, 30);
     wrap.onclick = (e) => {
       const b = e.target.closest('[data-i]');
       if (b) done(options[+b.dataset.i].value);
@@ -298,4 +339,31 @@ function bindRecDate(el, onPick) {
     else { toast('오늘이나 지난 날짜만 고를 수 있어요'); render(); }
   });
 }
+
+/* ───────── 시간 줄 [시작 ~ 끝 + 내용] (공부 탭, 운동 탭의 주말·그 밖의 운동) ─────────
+ * 내용 칸은 쓰는 만큼 늘어난다 */
+function timeRowHtml(r, i, ro, ph) {
+  return `<div class="st-row" data-i="${i}">
+  <input type="time" class="st-time" data-f="s" value="${r.s || ''}" aria-label="${i + 1}번째 시작 시간"${ro}>
+  <span class="st-tilde">~</span>
+  <input type="time" class="st-time" data-f="e" value="${r.e || ''}" aria-label="${i + 1}번째 끝 시간"${ro}>
+  <textarea class="st-row-text" data-f="t" rows="1" maxlength="300" placeholder="${ph}" aria-label="${i + 1}번째 내용"${ro}>${esc(r.t || '')}</textarea>
+</div>`;
+}
+function growText(el) {
+  el.style.height = 'auto';
+  // 비어 있으면 한 줄 (긴 안내 글씨 때문에 커지지 않게)
+  if (el.value && el.scrollHeight) el.style.height = `${el.scrollHeight + 2}px`;
+  else el.style.height = '';
+}
+const growAll = (root) => { for (const t of root.querySelectorAll('textarea.st-row-text')) growText(t); };
+document.addEventListener('input', (e) => { if (e.target.matches('textarea.st-row-text')) growText(e.target); });
+
+/* 키보드로도 누를 수 있게: role="button"인 목록 줄에서 Enter·Space = 누르기 */
+document.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('li[role="button"]')) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
 

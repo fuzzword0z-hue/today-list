@@ -9,12 +9,12 @@ const CATS = {
 };
 /* 케어 종류: 투약·처치(집에서 하는 약·수액 등) / 병원(진료·검사) */
 const CARE_KINDS = {
-  dose: { label: '투약·처치', short: '투약', hint: '집에서 하는 투약·처치 — 반복으로 등록하면 날마다 체크해요', yes: '먹였어요', no: '못 먹였어요', noShort: '못 먹임' },
+  dose: { label: '투약·처치', short: '투약', hint: '집에서 하는 투약·처치 — 반복으로 등록하면 날마다 체크해요', yes: '했어요', no: '못 했어요', noShort: '못 함' },
   vet: { label: '병원', short: '병원', hint: '병원 진료·검사 — 다녀오면 체크해요. 진료 전 요약에 쓰여요', yes: '다녀왔어요', no: '안 갔어요', noShort: '안 감' },
 };
-const REP_LABEL = { d1: '매일', d2: '이틀마다', d3: '3일마다', w1: '매주', w2: '2주마다', m1: '매달' };
+const REP_LABEL = { d1: '매일', d2: '이틀마다', d3: '3일마다', w1: '매주', w2: '2주마다', m1: '매달', y1: '매년' };
 const repKey = (r) => (r ? `${r.t}${r.n}` : '');
-const repLabel = (r) => (r ? REP_LABEL[repKey(r)] || `${r.n}${r.t === 'd' ? '일' : r.t === 'w' ? '주' : '달'}마다` : '');
+const repLabel = (r) => (r ? REP_LABEL[repKey(r)] || `${r.n}${r.t === 'd' ? '일' : r.t === 'w' ? '주' : r.t === 'y' ? '년' : '달'}마다` : '');
 
 const PILL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"/><path d="M7.5 8H12v8H7.5a4 4 0 0 1 0-8z" fill="currentColor"/></g></svg>';
 const CROSS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
@@ -58,9 +58,13 @@ function occursOn(ev, k) {
   if (!r) return k === ev.date;
   if (r.t === 'd') return diffDays(k, ev.date) % r.n === 0;
   if (r.t === 'w') return diffDays(k, ev.date) % (7 * r.n) === 0;
-  // 매달: 같은 날짜. 31일처럼 없는 날짜면 그 달의 마지막 날
+  // 매달·매년: 같은 날짜. 31일·2월 29일처럼 없는 날짜면 그 달의 마지막 날
   const a = parse(ev.date);
   const b = parse(k);
+  if (r.t === 'y') {
+    if ((b.getFullYear() - a.getFullYear()) % r.n || b.getMonth() !== a.getMonth()) return false;
+    return b.getDate() === Math.min(a.getDate(), new Date(b.getFullYear(), b.getMonth() + 1, 0).getDate());
+  }
   const months = (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth();
   if (months % r.n) return false;
   const last = new Date(b.getFullYear(), b.getMonth() + 1, 0).getDate();
@@ -81,7 +85,7 @@ function nextOccurrence(ev, from) {
   return null;
 }
 
-/* 케어 기록은 세 가지: 했음(done) · 못 했음(skip, 예: 못 먹임·안 감) · 기록 없음(둘 다 없음) */
+/* 케어 기록은 세 가지: 했음(done) · 못 했음(skip, 예: 못 함·안 감) · 기록 없음(둘 다 없음) */
 const isDone = (ev, k) => !!(ev.done && ev.done[k]);
 const isSkipped = (ev, k) => !!(ev.skip && ev.skip[k]);
 
@@ -118,7 +122,7 @@ function eventRow(ev, k) {
   const changed = ev.of ? (ev.ok && ev.ok !== ev.date ? `이 날만 변경 (원래 ${md(ev.ok)})` : '이 날만 변경') : '';
   const meta = [CATS[ev.cat].label + (kind ? ` · ${CARE_KINDS[kind].short}` : ''), repLabel(ev.rep), changed].filter(Boolean).join(' · ');
   const late = kind && !done && !skipped && k < today;
-  return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}${skipped ? ' skipped' : ''}" data-eid="${ev.id}" data-k="${k}">
+  return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}${skipped ? ' skipped' : ''}" data-eid="${ev.id}" data-k="${k}" tabindex="0" role="button" aria-label="${esc(ev.title)} 일정 열기">
     <span class="ev-time">${ev.time || '종일'}</span>
     <span class="ev-body">
       <span class="ev-title">${esc(ev.title)}</span>

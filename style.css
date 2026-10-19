@@ -1046,10 +1046,13 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .r-week li { padding-left: 0 !important; font-size: 14px !important; line-height: 1.5 !important; color: var(--text-2); }
 .r-week li::before { content: none !important; }
 .st-row-text:focus, .st-time:focus, .cond-memo:focus, .cond-w:focus { outline: none; border-color: var(--accent); }
-.cond-th { padding: 4px 12px 8px; min-height: 44px; }
+.cond-top { display: flex; align-items: center; }
+.cond-top .cond-head { flex: 1; min-width: 0; padding-right: 6px; }
+.cond-th { flex: none; display: flex; align-items: center; gap: 5px; min-height: 44px; margin-right: 8px; padding: 0 10px 0 6px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .cond-th .check { width: 22px; height: 22px; }
+.cond-th.on { color: var(--c-care); }
 .cond-th.on .check { background: var(--c-care); border-color: var(--c-care); }
-.cond-th.on .rt-label { color: var(--text-2); text-decoration: none; }
+.cond-th.on .check svg { opacity: 1; }
 .w20-ver { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; }
 .w20-ver button { padding: 6px 4px; }
 
@@ -1083,30 +1086,35 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .h-ic { background: var(--c-me-soft); color: var(--c-me); }
 .h-ic svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
 .cond-sum.h-alert { color: var(--c-me); font-weight: 700; }
-.h-week { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 0 12px 8px; font-size: 13px; color: var(--text-2); }
-.h-wl { margin-right: 2px; color: var(--text-3); }
-.h-stat { padding: 3px 8px; border-radius: 999px; background: var(--bg); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.h-stat b { color: var(--text); font-weight: 700; }
-.h-stat.over, .h-stat.over b { background: var(--c-life-soft); color: var(--c-life); }
-.h-stat.wait b { color: var(--c-life); }
-.h-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 12px; }
+.h-sum b { font-weight: 700; color: var(--text); }
+.h-sum .over, .h-sum .over b { color: var(--c-life); font-weight: 700; }
+.h-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 0 12px 12px; }
 .h-tg {
-  min-height: 44px;
-  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 4px;
   border-radius: 11px;
   border: 1px solid var(--line);
   background: var(--bg);
-  font-size: 13.5px;
-  line-height: 1.25;
   color: var(--text-2);
   word-break: keep-all;
+  line-height: 1.2;
 }
-.h-tg[aria-pressed="true"] { background: var(--c-life-soft); border-color: var(--c-life); color: var(--c-life); font-weight: 700; }
+.h-tg b { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.h-tg small { max-width: 100%; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-tg small .wait { color: var(--c-life); font-weight: 700; }
+.h-tg[aria-pressed="true"] { background: var(--c-life-soft); border-color: var(--c-life); color: var(--c-life); }
+.h-tg[aria-pressed="true"] b { color: var(--c-life); font-weight: 700; }
 .h-whys { padding: 0 12px 10px; margin-top: -4px; }
 .h-whys .cond-row { padding-top: 6px; }
 .h-whys .cond-label { width: 52px; }
 .h-whys .chips button[aria-pressed="true"] { background: var(--c-life); border-color: var(--c-life); }
-.h-note { margin: -4px 12px 10px; font-size: 12px; color: var(--text-3); }
+.h-note { margin: 10px 0 0; font-size: 12px; color: var(--text-2); }
 .h-body .cond-prev { white-space: nowrap; }
 .h-sub { display: flex; align-items: baseline; gap: 6px; margin: 16px 0 8px; font-size: 14px; font-weight: 700; }
 .h-sub span { font-size: 12px; font-weight: 400; color: var(--text-3); }
@@ -1136,3 +1144,13 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .r-sec .r-dist li { padding-left: 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
 .r-sec .r-dist li::before { content: none; }
 .r-health .r-tl { white-space: normal; }
+.backup-undo { width: 100%; min-height: 44px; margin-top: 8px; border-radius: 12px; border: 1px dashed var(--line); font-size: 14px; color: var(--text-2); }
+.care-group { width: 100%; text-align: left; background: var(--c-care-soft); padding: 8px 8px 8px 14px; }
+.care-group .banner-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.care-group .banner-text b { color: var(--text); font-weight: 700; margin-right: 4px; }
+
+/* 키보드가 올라와 있는 동안 (입력 칸 어디든): 하단 탭·아래 버튼·큰 제목을 숨겨 쓸 자리를 넓힌다 */
+.app.typing-field .composer,
+.app.typing-field .wo-actions,
+.app.typing-field .st-exams,
+.app.typing-field .view > .top { display: none; }

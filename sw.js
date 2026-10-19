@@ -4,9 +4,10 @@
  * (파일마다 따로 갱신하면 새 HTML + 옛 CSS처럼 버전이 섞여 화면이 깨질 수 있다)
  *
  * 배포할 때: VERSION을 올리고, index.html의 ?v= 값도 같은 값으로 맞춘다.
- * 새 버전은 설치 단계에서 서버에서 직접(HTTP 캐시 무시) 전부 받아 두고,
- * 준비가 끝나면 열려 있는 앱을 한 번 새로 고쳐 새 버전으로 바꾼다. */
-const VERSION = '14';
+ * 새 버전은 설치 단계에서 서버에서 직접(HTTP 캐시 무시) 전부 받아 둔다.
+ * 열려 있는 앱을 여기서 강제로 새로 고치지 않는다 (입력 중인 내용이 날아가므로) —
+ * 앱이 화면에서 내려갔을 때 앱 쪽(main.js)에서 새로 고친다. */
+const VERSION = '15';
 const CACHE = `today-v${VERSION}`;
 const ASSETS = [
   './',
@@ -35,28 +36,25 @@ const ASSETS = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(async (c) => {
+        await c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })));
+        // 서버(CDN)가 아직 옛 index.html을 주면 이 버전은 설치하지 않고 다음에 다시 시도한다
+        const html = await (await c.match('./index.html')).text();
+        if (!html.includes(`?v=${VERSION}`)) {
+          await caches.delete(CACHE);
+          throw new Error('index.html이 아직 새 버전이 아니에요');
+        }
+      })
       .then(() => self.skipWaiting()),
   );
 });
 
 self.addEventListener('activate', (e) => {
-  const ready = (async () => {
+  e.waitUntil((async () => {
     const old = (await caches.keys()).filter((k) => k !== CACHE);
     await Promise.all(old.map((k) => caches.delete(k)));
     await self.clients.claim();
-    return old.length > 0;
-  })();
-  e.waitUntil(ready);
-  // 이전 버전에서 올라온 경우: 열려 있는 앱을 새 버전으로 다시 연다.
-  // 주의: activate가 끝난 '뒤'에 해야 한다. activate 안에서 기다리면, 다시 여는 요청이
-  // activate가 끝나기를 기다리고 activate는 그 요청을 기다려서 서로 멈춘다.
-  ready.then(async (upgraded) => {
-    if (!upgraded) return;
-    for (const w of await self.clients.matchAll({ type: 'window' })) {
-      if (w.navigate) w.navigate(w.url).catch(() => {});
-    }
-  });
+  })());
 });
 
 self.addEventListener('fetch', (e) => {

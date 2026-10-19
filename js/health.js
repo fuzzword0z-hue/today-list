@@ -4,9 +4,10 @@
  * 오늘 화면의 카드. 매일 할 일은 '안 지킨 것만 누르기' — 아무것도 안 누른 날은 다 지킨 날이다.
  * 연속 달성(스트릭) 대신 '이번 주 예외 횟수 / 목표'로 보여 준다 (하루 실패해도 한 주는 성공할 수 있게).
  *
- * state.health  = { 'YYYY-MM-DD': { snack, snackWhy, food, foods: [...], veg, late, lateWhy } }
+ * state.health  = { 'YYYY-MM-DD': { snack, snackWhy, food, foods: [...], veg, late, lateWhy: [...] } }
  *   snack = 과자 먹은 날, food = 주의 음식(빵·라면·김밥·튀김) 먹은 날, veg = 야채 먼저 안 먹은 날,
- *   late = 그날 밤 11:30 넘어서 잔 날 (다음 날 아침 '어젯밤'으로 체크하고, 잔 날 밤의 날짜로 남긴다)
+ *   late = 그날 밤 11:30 넘어서 잔 날 (다음 날 아침 '어젯밤'으로, 밤 10시 넘어서는 '오늘 밤'으로 체크하고, 잔 날 밤의 날짜로 남긴다)
+ *   lateWhy = 늦게 잔 이유 (여러 개: 일 · 집안일 · 고양이 케어 · 핸드폰 · 잠이 안 옴)
  * state.hgoal   = { snack, veg, late, food }   주 목표 (주 n회 이하), 주의 음식은 n일에 한 번
  * state.hstart  = 처음 카드를 본 날 (리포트는 이 날부터 센다 — 체크가 없는 날도 '지킨 날'이라서)
  * state.weights = { 'YYYY-MM-DD': kg }   내 체중 (체중계가 있는 본가에서, 한 달에 한 번쯤)
@@ -20,8 +21,8 @@ const H_ITEMS = [
   { id: 'food', label: '주의 음식 먹음', short: '주의 음식', main: '주의 음식', sub: '먹음', why: 'foods', ask: '무엇', multi: true,
     opts: [['bread', '빵'], ['ramen', '라면'], ['gimbap', '김밥'], ['fried', '튀김']] },
   { id: 'veg', label: '야채 먼저 안 먹음', short: '야채', main: '야채 먼저', sub: '안 먹음' },
-  { id: 'late', label: '어젯밤 11:30 넘어 잠', short: '늦게 잠', main: '늦게 잠', sub: '어젯밤', why: 'lateWhy', ask: '이유', night: true,
-    opts: [['work', '일'], ['phone', '핸드폰'], ['awake', '잠이 안 옴']] },
+  { id: 'late', label: '어젯밤 11:30 넘어 잠', short: '늦게 잠', main: '늦게 잠', sub: '어젯밤', why: 'lateWhy', ask: '이유', night: true, multi: true,
+    opts: [['work', '일'], ['chores', '집안일'], ['cat', '고양이 케어'], ['phone', '핸드폰'], ['awake', '잠이 안 옴']] },
 ];
 const H_WEEKLY = ['snack', 'veg', 'late']; // 주 n회 이하가 목표인 항목
 const H_GOAL = { snack: 2, veg: 2, late: 2, food: 14 };
@@ -39,7 +40,10 @@ const hItem = (id) => H_ITEMS.find((it) => it.id === id);
 const hGoal = () => ({ ...H_GOAL, ...state.hgoal });
 const hOn = (id, d) => !!(state.health[d] && state.health[d][id]);
 /* 보고 있는 날 k에서 그 항목이 기록되는 날 (늦게 잔 날은 전날 밤) */
-const hDay = (it, k) => (it.night ? addDays(k, -1) : k);
+/* 밤 10시 ~ 새벽 4시(하루가 바뀌기 전)에 오늘 화면을 보면 '늦게 잠'은 오늘 밤 (자기 전에 미리 체크) */
+const lateTonight = () => { const h = new Date().getHours(); return h >= 22 || h < DAY_START_HOUR; };
+const hDay = (it, k) => (it.night ? (k === today && lateTonight() ? k : addDays(k, -1)) : k);
+const nightWord = (k) => (k === today && lateTonight() ? '오늘 밤' : '어젯밤');
 const weekStart = (k) => addDays(k, -parse(k).getDay()); // 일요일
 const addMonths = (k, n) => {
   const d = parse(k);
@@ -125,13 +129,13 @@ function renderHealth() {
       if (v) return v;
     }
     if (it.id === 'food' && !h.food && lf) return `<span class="${gap < goal.food ? 'wait' : ''}">D+${gap}</span>`;
-    return it.sub;
+    return it.night ? nightWord(k) : it.sub;
   };
 
   // 이유 고르기: 아직 고르지 않은 것만 (펼치면 전부)
   const whyRows = H_ITEMS.filter((it) => it.opts && hOn(it.id, hDay(it, k))).filter((it) => {
     const v = state.health[hDay(it, k)][it.why];
-    return open || it.multi || !v; // 여러 개 고르는 주의 음식은 계속 보여 준다
+    return open || it.multi || !v; // 여러 개 고르는 것(주의 음식 · 늦게 잔 이유)은 누른 동안 계속 보여 준다
   }).map((it) => {
     const h = state.health[hDay(it, k)];
     const cur = it.multi ? h[it.why] || [] : [h[it.why]];
@@ -148,7 +152,8 @@ function renderHealth() {
     </button>
     <div class="h-row" role="group" aria-label="안 지킨 것만 누르기">${H_ITEMS.map((it) => {
       const pressed = hOn(it.id, hDay(it, k));
-      return `<button class="h-tg" data-h="${it.id}" aria-pressed="${pressed}" aria-label="${it.label}"><b>${it.main}</b><small>${sub(it)}</small></button>`;
+      const label = it.night ? `${nightWord(k)} 11:30 넘어 잠` : it.label;
+      return `<button class="h-tg" data-h="${it.id}" aria-pressed="${pressed}" aria-label="${label}"><b>${it.main}</b><small>${sub(it)}</small></button>`;
     }).join('')}</div>
     ${whyRows ? `<div class="h-whys">${whyRows}</div>` : ''}
     ${open ? healthBody(k, lf, gap) : ''}`;
@@ -182,7 +187,7 @@ function healthBody(k, lf, gap) {
       <div>늦게 잔 날 주 ${stepper('late', '회 이하')}</div>
       <div>주의 음식 ${stepper('food', '일에 한 번')}</div>
     </div>
-    <p class="cond-help">아무것도 안 누른 날은 다 지킨 날이에요. 늦게 잔 날은 다음 날 아침에 '어젯밤'으로 눌러요. 월간·연간 리포트에 쓰여요.</p>
+    <p class="cond-help">아무것도 안 누른 날은 다 지킨 날이에요. 늦게 잔 날은 다음 날 아침에 '어젯밤'으로 (밤 10시 넘어서는 '오늘 밤'으로) 누르고, 이유는 여러 개 고를 수 있어요. 월간·연간 리포트에 쓰여요.</p>
   </div>`;
 }
 
@@ -338,6 +343,8 @@ const SNACK_TIP = {
 };
 const LATE_TIP = {
   work: '일이 늦게 끝나는 날이 많아요. 그런 날은 씻고 바로 누울 수 있게 잘 준비를 미리 해 두세요.',
+  chores: '집안일이 밤으로 밀리는 날이 많아요. 저녁 먹고 15분만 먼저 해 두고, 내일로 넘겨도 되는 일은 넘겨 보세요.',
+  cat: '고양이 케어로 늦어지는 날이 많아요. 투약·수액 시간을 조금 앞당기거나 준비물을 미리 꺼내 두면 잠자리에 일찍 들 수 있어요.',
   phone: '11시가 되면 핸드폰을 침대에서 먼 곳에 충전해 두세요.',
   awake: '잠이 안 오는 날이 많아요. 커피는 오후 2시 전까지만, 자기 전 30분은 화면을 멀리해 보세요.',
 };
@@ -369,7 +376,8 @@ function analyzeHealth(start, last, end) {
     if (h.veg) hl.veg++;
     if (h.late) {
       hl.late++;
-      bump(hl.why.late, h.lateWhy || 'none');
+      const why = Array.isArray(h.lateWhy) ? h.lateWhy : h.lateWhy ? [h.lateWhy] : [];
+      if (why.length) for (const w of why) bump(hl.why.late, w); else bump(hl.why.late, 'none');
       if (addDays(d, 1) <= last && hOn('snack', addDays(d, 1))) hl.lateSnack++;
     }
     if (h.food) {

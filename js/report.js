@@ -29,6 +29,7 @@ function hasData({ start, end }) {
   for (const k in state.cond) if (k >= start && k <= end) return true;
   for (const k in state.workouts) if (k >= start && k <= end) return true;
   for (const k in state.studies) if (k >= start && k <= end) return true;
+  for (const o of [state.health, state.weights, state.labs]) for (const k in o) if (k >= start && k <= end) return true;
   const inRange = (o) => o && Object.keys(o).some((k) => k >= start && k <= end);
   return state.events.some((ev) => inRange(ev.done) || inRange(ev.skip));
 }
@@ -207,6 +208,7 @@ function analyze(id) {
     }
   }
   m.st = st;
+  m.hl = analyzeHealth(start, last, end);
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
@@ -230,6 +232,8 @@ function score(m) {
   if (m.careSched) parts.push({ label: '케어 기록', v: m.careRecorded / m.careSched, w: 0.2 });
   if (m.wo.days) parts.push({ label: '운동 (한 날)', v: m.wo.days / m.wo.span, w: 0.2 });
   if (m.st.days && m.st.wdays) parts.push({ label: '평일 루틴', v: m.st.full / m.st.wdays, w: 0.2 });
+  const hw = m.hl.weeks.length;
+  if (hw) parts.push({ label: '건강 습관 (주 목표)', v: (m.hl.ok.snack + m.hl.ok.veg + m.hl.ok.late + m.hl.ok.food) / (hw * 4), w: 0.2 });
   if (!parts.length) return null;
   const sw = parts.reduce((a, p) => a + p.w, 0);
   const total = Math.round((parts.reduce((a, p) => a + p.v * p.w, 0) / sw) * 100);
@@ -293,6 +297,8 @@ function feedback(m, p) {
       good.push(`가장 잘한 달은 ${bm.i + 1}월이에요 (완료율 ${pct(bm.rate)}%).`);
     }
   }
+  const hf = healthFeedback(m.hl);
+  good.push(...hf.good);
   if (!good.length) good.push('기록을 남긴 것 자체가 좋은 출발이에요. 기록이 쌓일수록 더 정확하게 분석해 드릴게요.');
 
   /* 개선하면 좋을 점 (부드러운 제안) */
@@ -341,6 +347,7 @@ function feedback(m, p) {
     improve.push(`운동한 날이 ${m.wo.span}일 중 ${m.wo.days}일이에요. 하는 시간을 정해 두고(예: 씻기 전) 주 3–4일부터 이어 가 보세요.`);
     goals.push('운동 주 4일');
   }
+  improve.push(...hf.improve);
   if (!improve.length) improve.push('지금 리듬을 그대로 유지하면서, 하루 중 가장 중요한 일 하나를 맨 위에 적어 보세요.');
 
   /* 고쳤으면 하는 점 (분명한 습관 문제) */
@@ -360,13 +367,15 @@ function feedback(m, p) {
   if (m.open >= 5) fix.push(`끝내지도, 미루지도 않고 남은 일이 ${m.open}개예요. 하루를 마칠 때 남은 일은 '내일로' 넘기거나 지워서 정리해 주세요.`);
   if (m.active && m.gap.len >= 4) fix.push(`${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 바쁜 날엔 한 줄이라도 남겨 보세요.`);
   if (r !== null && m.total >= 10 && r < 0.5) fix.push(`완료율이 ${pct(r)}%로 절반에 못 미쳐요. 할 일 수를 줄이는 것부터 시작해 보세요.`);
+  fix.push(...hf.fix);
+  goals.push(...hf.goals);
   if (!fix.length) fix.push('특별히 고칠 점이 보이지 않아요. 지금처럼만 해 주세요.');
 
   /* 목표 */
   if (r !== null && r < 0.85) goals.unshift(`완료율 ${Math.min(90, Math.ceil((pct(r) + 10) / 5) * 5)}% 넘기기`);
   if (goals.length < 3 && m.streakBest) goals.push(`연속 완료 ${m.streakBest + 3}일 도전`);
 
-  return { good: good.slice(0, 5), improve: improve.slice(0, 4), fix: fix.slice(0, 4), goals: [...new Set(goals)].slice(0, 3), W };
+  return { good: good.slice(0, 6), improve: improve.slice(0, 5), fix: fix.slice(0, 5), goals: [...new Set(goals)].slice(0, 4), W };
 }
 
 /* 긍정적인 평가 (응원) */
@@ -401,7 +410,8 @@ function renderReport(id) {
   const el = $('report');
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
-  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.st.days)) {
+  const [hlSec, hlLines] = healthSection(m.hl, m.yearly);
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.st.days && !hlSec)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -547,15 +557,16 @@ function renderReport(id) {
       ${s ? `<div class="r-score"><b>${s.total}</b><span>점</span><span class="r-grade">${s.grade}</span></div>
       <ul class="r-parts">${s.parts.map((pp) => `
         <li><span class="r-plabel">${pp.label}</span><span class="r-meter"><i style="width:${pct(pp.v)}%"></i></span><span class="r-pval">${pct(pp.v)}%</span></li>`).join('')}
-      </ul>` : '<p class="r-tip">점수를 낼 할 일·케어·운동 기록이 아직 없어요.</p>'}
+      </ul>` : '<p class="r-tip">점수를 낼 할 일·케어·운동·건강 기록이 아직 없어요.</p>'}
     </section>
-    <section class="r-sec"><h2>숫자로 보는 ${m.yearly ? `${id}년` : `${+id.slice(5)}월`}</h2>
+    ${tiles.length ? `<section class="r-sec"><h2>숫자로 보는 ${m.yearly ? `${id}년` : `${+id.slice(5)}월`}</h2>
       <div class="r-tiles">${tiles.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>
       ${prev ? `<p class="r-tip">▲▼ 는 ${f.W.prev}와 비교한 값이에요.</p>` : ''}
-    </section>
+    </section>` : ''}
     ${monthsChart}
     ${stSec}
     ${woSec}
+    ${hlSec}
     <section class="r-sec good"><h2>잘하고 있는 점</h2><ul>${li(f.good)}</ul></section>
     <section class="r-sec cheer"><h2>긍정적인 평가</h2><p>${esc(cheerText)}</p></section>
     <section class="r-sec improve"><h2>개선하면 좋을 점</h2><ul>${li(f.improve)}</ul></section>
@@ -569,10 +580,10 @@ function renderReport(id) {
     s ? `종합 평가: ${s.total}점 (${s.grade})` : '종합 평가: 점수를 낼 기록이 없어요',
     ...(s ? s.parts.map((pp) => `- ${pp.label}: ${pct(pp.v)}%`) : []),
     '',
-    '숫자로 보기',
-    ...tiles.map(([l, v]) => `- ${l}: ${v.replace(/<[^>]+>/g, '')}`),
+    ...(tiles.length ? ['숫자로 보기', ...tiles.map(([l, v]) => `- ${l}: ${v.replace(/<[^>]+>/g, '')}`)] : []),
     ...(stLines.length ? ['', '공부', ...stLines] : []),
     ...(woLines.length ? ['', '운동', ...woLines] : []),
+    ...(hlLines.length ? ['', '건강', ...hlLines] : []),
     '',
     '잘하고 있는 점', ...f.good.map((t) => `- ${t}`),
     '',

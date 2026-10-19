@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
   <title>오늘</title>
 </head>
 <body>
@@ -54,6 +54,7 @@
         </div>
         <ul class="ev-list" id="today-events"></ul>
         <div class="cond" id="cond" hidden></div>
+        <div class="cond health" id="health" hidden></div>
         <ul class="list" id="list"></ul>
         <div class="empty" id="empty" hidden>
           <p class="empty-title">할 일을 적어 보세요</p>
@@ -275,6 +276,23 @@
       </form>
     </div>
 
+    <!-- ───────── 진료 검사 수치 시트 ───────── -->
+    <div class="sheet-wrap" id="lab-sheet" hidden>
+      <div class="backdrop" data-close></div>
+      <form class="sheet" id="lab-form" autocomplete="off" novalidate>
+        <div class="sheet-head">
+          <button type="button" class="sheet-btn" data-close>취소</button>
+          <h2 id="lab-title">진료 수치 적기</h2>
+          <button type="submit" class="sheet-btn strong">저장</button>
+        </div>
+        <p class="lab-prev" id="lab-prev" hidden></p>
+        <div class="fields lab-fields" id="lab-fields"></div>
+        <textarea class="ev-memo" id="lab-memo" rows="2" maxlength="500" placeholder="메모 (약 변경, 들은 이야기 등)"></textarea>
+        <p class="lab-help">받은 수치만 적으면 돼요. 다음 진료는 4개월 뒤로 잡혀 있어요.</p>
+        <button type="button" class="sheet-del" id="lab-del" hidden>이 진료 기록 지우기</button>
+      </form>
+    </div>
+
     <!-- 선택지 (반복 일정 수정·삭제 범위 등) -->
     <div class="sheet-wrap" id="choice" hidden>
       <div class="backdrop" data-close></div>
@@ -291,16 +309,17 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=13"></script>
-  <script src="js/events.js?v=13"></script>
-  <script src="js/today.js?v=13"></script>
-  <script src="js/calendar.js?v=13"></script>
-  <script src="js/stats.js?v=13"></script>
-  <script src="js/report.js?v=13"></script>
-  <script src="js/care.js?v=13"></script>
-  <script src="js/workout.js?v=13"></script>
-  <script src="js/study.js?v=13"></script>
-  <script src="js/backup.js?v=13"></script>
-  <script src="js/main.js?v=13"></script>
+  <script src="js/core.js?v=14"></script>
+  <script src="js/events.js?v=14"></script>
+  <script src="js/today.js?v=14"></script>
+  <script src="js/calendar.js?v=14"></script>
+  <script src="js/stats.js?v=14"></script>
+  <script src="js/report.js?v=14"></script>
+  <script src="js/care.js?v=14"></script>
+  <script src="js/workout.js?v=14"></script>
+  <script src="js/study.js?v=14"></script>
+  <script src="js/health.js?v=14"></script>
+  <script src="js/backup.js?v=14"></script>
+  <script src="js/main.js?v=14"></script>
 </body>
 </html>

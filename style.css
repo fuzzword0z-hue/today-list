@@ -29,6 +29,9 @@
   --c-work-soft: #e2edfb;
   --c-life-soft: #fde8df;
   --c-care-soft: #dcf4ea;
+  /* 내 건강 */
+  --c-me: #c8457a;
+  --c-me-soft: #fbe5ee;
 
   --tabh: 56px;
   --radius: 14px;
@@ -65,6 +68,8 @@
     --c-work-soft: #1b2a40;
     --c-life-soft: #3a2117;
     --c-care-soft: #13302a;
+    --c-me: #e0709a;
+    --c-me-soft: #3a1d29;
   }
 }
 
@@ -1073,3 +1078,61 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .stale-acts .wo-btn { height: 40px; font-size: 13px; }
 .stale-acts .wo-btn.primary { grid-column: 1 / -1; }
 .locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-chip, .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }
+
+/* ───────── 내 건강 카드 ───────── */
+.h-ic { background: var(--c-me-soft); color: var(--c-me); }
+.h-ic svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
+.cond-sum.h-alert { color: var(--c-me); font-weight: 700; }
+.h-week { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 0 12px 8px; font-size: 13px; color: var(--text-2); }
+.h-wl { margin-right: 2px; color: var(--text-3); }
+.h-stat { padding: 3px 8px; border-radius: 999px; background: var(--bg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.h-stat b { color: var(--text); font-weight: 700; }
+.h-stat.over, .h-stat.over b { background: var(--c-life-soft); color: var(--c-life); }
+.h-stat.wait b { color: var(--c-life); }
+.h-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 12px; }
+.h-tg {
+  min-height: 44px;
+  padding: 6px 8px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: var(--text-2);
+  word-break: keep-all;
+}
+.h-tg[aria-pressed="true"] { background: var(--c-life-soft); border-color: var(--c-life); color: var(--c-life); font-weight: 700; }
+.h-whys { padding: 0 12px 10px; margin-top: -4px; }
+.h-whys .cond-row { padding-top: 6px; }
+.h-whys .cond-label { width: 52px; }
+.h-whys .chips button[aria-pressed="true"] { background: var(--c-life); border-color: var(--c-life); }
+.h-note { margin: -4px 12px 10px; font-size: 12px; color: var(--text-3); }
+.h-body .cond-prev { white-space: nowrap; }
+.h-sub { display: flex; align-items: baseline; gap: 6px; margin: 16px 0 8px; font-size: 14px; font-weight: 700; }
+.h-sub span { font-size: 12px; font-weight: 400; color: var(--text-3); }
+.h-next { margin: 0 0 8px; font-size: 13px; color: var(--text-2); }
+.h-next b { color: var(--text); }
+.h-empty { margin: 0 0 8px; font-size: 13px; color: var(--text-3); }
+.h-labs { display: grid; grid-template-columns: max-content repeat(var(--n), minmax(0, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.h-labs > * { padding: 7px 6px; border-top: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.h-labs > .h-lh { border-top: 0; color: var(--text-2); font-weight: 600; }
+.h-ld { color: var(--c-me) !important; text-decoration: underline; text-underline-offset: 3px; }
+.h-ll { text-align: left; color: var(--text-2); white-space: nowrap; }
+.h-lv small { display: block; font-size: 11px; color: var(--text-3); }
+.h-add { width: 100%; height: 44px; margin-top: 8px; border-radius: 11px; background: var(--c-me-soft); color: var(--c-me); font-weight: 700; font-size: 14px; }
+.h-goals { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
+.h-goals > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.h-step { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.h-step button { width: 36px; height: 32px; font-size: 16px; color: var(--text-2); }
+.h-step b { min-width: 22px; text-align: center; color: var(--text); font-variant-numeric: tabular-nums; }
+.lab-prev { margin: 0 0 4px; padding: 8px 12px; border-radius: 10px; background: var(--c-me-soft); font-size: 13px; color: var(--text); }
+.lab-fields .field > span { width: 92px; }
+.lab-fields .field em { flex: none; width: 42px; font-style: normal; font-size: 13px; color: var(--text-3); }
+.lab-help { margin: 8px 2px 0; font-size: 12px; color: var(--text-3); }
+.r-dist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+.r-dist b { margin-right: 4px; color: var(--text); font-weight: 600; }
+.r-sec .h-labs { margin-top: 4px; background: var(--surface); }
+.r-sec .r-dist { gap: 4px; }
+.r-sec .r-dist li { padding-left: 0; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.r-sec .r-dist li::before { content: none; }
+.r-health .r-tl { white-space: normal; }

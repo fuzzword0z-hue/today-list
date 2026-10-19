@@ -16,7 +16,8 @@
  *   cond: { 'YYYY-MM-DD': { ap, en, vo, st, w, n } }   고양이 컨디션 (js/care.js)
  *   workout, workouts                 운동 체크 상태와 '오늘 운동 완료' 기록 (js/workout.js)
  *   study, studies                    공부 탭에 적어 둔 내용과 '오늘 공부 완료' 기록 (js/study.js)
- *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   요일과 다르게 고른 날 (쉬는 평일 등)
+ *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   출근일 · 쉬는 날을 기본(매주 쉬는 요일)과 다르게 고른 날
+ *   offDays: [요일]   매주 쉬는 요일 (0 = 일요일, 처음엔 [1] 월요일)
  *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
@@ -54,6 +55,7 @@ function normalize(s) {
     delete s.study.b;
   }
   s.daymode = obj(s.daymode) ? s.daymode : {};
+  if (!Array.isArray(s.offDays) || !s.offDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) s.offDays = [1];
   s.health = obj(s.health) ? s.health : {};
   s.hgoal = obj(s.hgoal) ? s.hgoal : {};
   s.weights = obj(s.weights) ? s.weights : {};
@@ -340,7 +342,7 @@ function bindRecDate(el, onPick) {
   });
 }
 
-/* ───────── 시간 줄 [시작 ~ 끝 + 내용] (공부 탭, 운동 탭의 주말·그 밖의 운동) ─────────
+/* ───────── 시간 줄 [시작 ~ 끝 + 내용] (공부 탭, 운동 탭의 쉬는 날·그 밖의 운동) ─────────
  * 내용 칸은 쓰는 만큼 늘어난다 */
 function timeRowHtml(r, i, ro, ph) {
   return `<div class="st-row" data-i="${i}">

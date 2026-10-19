@@ -15,7 +15,7 @@ function renderToday() {
   $('date-main').textContent = `${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일`;
   let rel = relDay(k);
   if (d.getFullYear() !== parse(today).getFullYear()) rel = `${d.getFullYear()}년 · ${rel}`;
-  $('date-sub').textContent = rel;
+  $('date-sub').textContent = `${rel}${dayMode(k) === 'weekend' ? ' · 쉬는 날' : ''}`;
   $('date-sub').classList.toggle('is-today', diff === 0);
   $('go-today').hidden = diff === 0;
 

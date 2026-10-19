@@ -13,6 +13,7 @@ function renderCal() {
   $('cal-today').hidden = start === monthStart(today) && ui.calSel === today;
 
   renderCare(start, end);
+  renderOffBar();
   renderMonthGrid(start, end);
   renderDayPanel();
   renderUpcoming();
@@ -106,6 +107,40 @@ $('care').addEventListener('click', (e) => {
   else openSheet({ id: li.dataset.eid, k: li.dataset.k });
 });
 
+/* ───────── 쉬는 날 고르기 (근무표 · 연차) ─────────
+ * 기본은 '매주 쉬는 요일'(월요일). 스케줄 휴무·연차·공휴일 다음 날 휴관은 이 모드에서 날짜를 눌러 바꾼다.
+ * 쉬는 날은 달력에 '휴'로 표시되고, 운동·공부 탭과 리포트의 출근일 루틴이 이 기준을 따른다. */
+let offEdit = false;
+
+function renderOffBar() {
+  const el = $('off-bar');
+  $('month').classList.toggle('off-editing', offEdit);
+  if (!offEdit) {
+    el.innerHTML = `<button class="off-open" id="off-open"><i class="off-mark">휴</i><span>쉬는 날 고르기</span><small>근무표 · 연차</small><span class="off-go">›</span></button>`;
+    return;
+  }
+  const days = offDays();
+  el.innerHTML = `<div class="off-edit">
+    <p class="off-help"><b>날짜를 누르면 쉬는 날 ↔ 출근일</b>이 바뀌어요. 스케줄 휴무, 연차, 공휴일 다음 날 휴관을 골라 주세요.</p>
+    <div class="off-week"><span>매주 쉬는 요일</span>
+      <div class="chips" data-off-week>${WD.map((w, i) => `<button type="button" data-wd="${i}" aria-pressed="${days.includes(i)}">${w}</button>`).join('')}</div>
+    </div>
+    <button class="off-done" id="off-done">완료</button>
+  </div>`;
+}
+
+$('off-bar').addEventListener('click', (e) => {
+  if (e.target.closest('#off-open')) { offEdit = true; renderCal(); return; }
+  if (e.target.closest('#off-done')) { offEdit = false; renderCal(); return; }
+  const b = e.target.closest('[data-off-week] [data-wd]');
+  if (!b) return;
+  const d = +b.dataset.wd;
+  const days = offDays();
+  state.offDays = days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort();
+  save();
+  renderCal();
+});
+
 /* ───────── 달력 ───────── */
 function renderMonthGrid(start, end) {
   const lead = parse(start).getDay(); // 일요일 시작 (통계와 같게)
@@ -113,7 +148,7 @@ function renderMonthGrid(start, end) {
     .map((w, i) => `<div class="mg-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
   html += '<div class="mg-cell blank"></div>'.repeat(lead);
 
-  let doseSeen = false, skipSeen = false, symSeen = false;
+  let doseSeen = false, skipSeen = false, symSeen = false, offSeen = false;
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const evs = eventsOn(k);
     // 반복 케어(투약)는 칸을 차지하지 않게 날짜 옆 작은 알약 표시로만 보여 준다
@@ -134,13 +169,16 @@ function renderMonthGrid(start, end) {
     const s = (state.days[k] || []);
     const tasks = s.length ? `<span class="mg-tasks">${s.filter((t) => t.d).length}/${s.length}</span>` : '';
     const wd = parse(k).getDay();
+    const off = dayMode(k) === 'weekend';
+    if (off) offSeen = true;
     const cls = ['mg-cell'];
+    if (off) cls.push('off');
     if (k === today) cls.push('today');
     if (k === ui.calSel) cls.push('sel');
     if (wd === 0) cls.push('sun');
     if (wd === 6) cls.push('sat');
-    html += `<button class="${cls.join(' ')}" data-k="${k}" aria-label="${mdw(k)} 일정 ${evs.length}개">
-      <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}${sym ? '<i class="sym"></i>' : ''}</span>
+    html += `<button class="${cls.join(' ')}" data-k="${k}" aria-label="${mdw(k)}${off ? ' 쉬는 날' : ''} 일정 ${evs.length}개"${offEdit ? ` aria-pressed="${off}"` : ''}>
+      <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}${sym ? '<i class="sym"></i>' : ''}${off ? '<i class="off-mark">휴</i>' : ''}</span>
       ${shown.slice(0, 2).map((ev) => `<span class="mg-ev cat-${ev.cat}">${esc(ev.title)}</span>`).join('')}
       ${shown.length > 2 ? `<span class="mg-more">+${shown.length - 2}</span>` : ''}
       ${tasks}
@@ -153,6 +191,7 @@ function renderMonthGrid(start, end) {
     doseSeen ? '<span><i class="dose given"></i>투약 완료</span><span><i class="dose planned"></i>예정</span><span><i class="dose missed"></i>기록 없음</span>' : '',
     skipSeen ? '<span><i class="dose skipped"></i>못 함</span>' : '',
     symSeen ? '<span><i class="sym"></i>컨디션 이상</span>' : '',
+    offSeen ? '<span><i class="off-mark">휴</i>쉬는 날</span>' : '',
     '<span class="mg-tasks-key">3/5 할 일</span>',
   ].join('');
 }
@@ -160,6 +199,14 @@ function renderMonthGrid(start, end) {
 $('month').addEventListener('click', (e) => {
   const b = e.target.closest('[data-k]');
   if (!b) return;
+  if (offEdit) {
+    // 쉬는 날 고르기: 누를 때마다 쉬는 날 ↔ 출근일
+    const k = b.dataset.k;
+    setDayMode(k, dayMode(k) === 'weekend' ? 'weekday' : 'weekend');
+    if (navigator.vibrate) navigator.vibrate(5);
+    renderCal();
+    return;
+  }
   ui.calSel = b.dataset.k;
   renderCal();
 });

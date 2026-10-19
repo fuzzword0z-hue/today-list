@@ -1204,3 +1204,24 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .w-chart text.w-date { fill: var(--text-3); font-size: 10px; font-weight: 400; }
 .care-all { display: flex; justify-content: flex-end; margin: -2px 0 8px; }
 .crash-box .backup-btn:not(.primary) { border: 1px solid var(--line); }
+
+/* ───────── 캘린더: 쉬는 날 고르기 ───────── */
+.off-mark { display: inline-grid; place-items: center; flex: none; width: 14px; height: 14px; border-radius: 4px; background: var(--track); color: var(--text-2); font-size: 9.5px; font-style: normal; font-weight: 700; line-height: 1; }
+.off-bar { margin: 8px 0; }
+.off-open { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--surface); font-size: 14px; font-weight: 600; text-align: left; }
+.off-open small { font-weight: 400; color: var(--text-3); font-size: 12px; }
+.off-open .off-go { margin-left: auto; color: var(--text-3); }
+.off-open .off-mark { width: 18px; height: 18px; font-size: 11px; }
+.off-edit { padding: 12px; border-radius: 12px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.off-help { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.off-help b { color: var(--text); }
+.off-week { display: flex; flex-direction: column; gap: 6px; }
+.off-week > span { font-size: 13px; color: var(--text-2); }
+.off-week .chips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.off-week .chips button { padding: 6px 0; text-align: center; }
+.off-week .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.off-done { width: 100%; height: 44px; margin-top: 10px; border-radius: 11px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 15px; }
+.mg-cell.off { background: color-mix(in srgb, var(--track) 55%, transparent); }
+.off-editing .mg-cell { box-shadow: inset 0 0 0 1px var(--line); }
+.off-editing .mg-cell.off { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.off-editing .mg-cell.off .off-mark { background: var(--accent); color: var(--on-accent); }

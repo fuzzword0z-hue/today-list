@@ -18,7 +18,9 @@ function renderCal() {
   renderUpcoming();
 }
 
-/* ───────── 케어 요약: 다음 투약 · 다음 진료 · 이번 달 기록 ───────── */
+/* ───────── 케어 요약: 다음 투약 · 다음 진료 · 보고 있는 달의 기록 ───────── */
+// 보고 있는 달이 이번 달이면 '이번 달', 아니면 'N월'
+const monthLabel = (k) => (monthStart(k) === monthStart(today) ? '이번 달' : `${parse(k).getMonth() + 1}월`);
 function renderCare(start, end) {
   const care = state.events.filter((ev) => ev.cat === 'care');
   const el = $('care');
@@ -34,7 +36,7 @@ function renderCare(start, end) {
   }
 
   const rows = [];
-  // 반복 투약: 오늘이면 바로 체크, 아니면 다음 날짜 + 이번 달 기록
+  // 반복 투약: 오늘이면 바로 체크, 아니면 다음 날짜 + 보고 있는 달의 기록
   for (const ev of care.filter((x) => isDose(x) && x.rep && ((!x.until || x.until >= today) || overridesOf(x).some((o) => o.date >= today)))) {
     // 이 날만 바꾼 회차도 같은 투약으로 센다. 오늘 회차는 체크하기 전에는 세지 않는다
     const next = nextOfSeries(ev, today);
@@ -46,12 +48,12 @@ function renderCare(start, end) {
     const doneToday = todayDose && isDone(next.ev, today);
     const skippedToday = todayDose && isSkipped(next.ev, today);
     const status = todayDose
-      ? (doneToday ? '<b class="ok">오늘 완료</b>' : skippedToday ? '<b>오늘 못 먹임</b>' : '<b>오늘이에요</b>')
+      ? (doneToday ? '<b class="ok">오늘 완료</b>' : skippedToday ? '<b>오늘 못 함</b>' : '<b>오늘이에요</b>')
       : next ? `다음 ${relDay(next.k)} · ${mdw(next.k)}` : '일정 끝남';
-    rows.push(`<li class="care-row" data-eid="${next ? next.ev.id : ev.id}" data-k="${next ? next.k : today}">
+    rows.push(`<li class="care-row" data-eid="${next ? next.ev.id : ev.id}" data-k="${next ? next.k : today}" tabindex="0" role="button">
       <span class="care-ic">${PILL_SVG}</span>
       <span class="care-body"><span class="care-title">${esc(ev.title)} <small>${repLabel(ev.rep)}</small></span>
-        <span class="care-sub">${status}${sched ? ` · 이번 달 ${given}/${sched}회 먹임` : ''}</span></span>
+        <span class="care-sub">${status}${sched ? ` · ${monthLabel(start)} ${given}/${sched}회 했음` : ''}</span></span>
       ${todayDose ? `<button class="ev-check" aria-pressed="${doneToday}" aria-label="오늘 ${esc(ev.title)} 완료">${CHECK_SVG}</button>` : ''}
     </li>`);
   }
@@ -60,7 +62,7 @@ function renderCare(start, end) {
   const next = nextVisit(today);
   const last = lastVisit(today);
   if (next) {
-    rows.push(`<li class="care-row" data-eid="${next.ev.id}" data-k="${next.k}">
+    rows.push(`<li class="care-row" data-eid="${next.ev.id}" data-k="${next.k}" tabindex="0" role="button">
       <span class="care-ic">${CROSS_SVG}</span>
       <span class="care-body"><span class="care-title">${esc(next.ev.title)}</span>
         <span class="care-sub">${mdw(next.k)}${next.ev.time ? ` ${next.ev.time}` : ''}${next.ev.memo ? ` · ${esc(next.ev.memo)}` : ''}</span></span>
@@ -149,7 +151,7 @@ function renderMonthGrid(start, end) {
   $('cal-legend').innerHTML = [
     ...Object.entries(CATS).map(([c, v]) => `<span><i class="sw cat-${c}"></i>${v.label}</span>`),
     doseSeen ? '<span><i class="dose given"></i>투약 완료</span><span><i class="dose planned"></i>예정</span><span><i class="dose missed"></i>기록 없음</span>' : '',
-    skipSeen ? '<span><i class="dose skipped"></i>못 먹임</span>' : '',
+    skipSeen ? '<span><i class="dose skipped"></i>못 함</span>' : '',
     symSeen ? '<span><i class="sym"></i>컨디션 이상</span>' : '',
     '<span class="mg-tasks-key">3/5 할 일</span>',
   ].join('');
@@ -198,7 +200,7 @@ function renderUpcoming() {
     .slice(0, 6);
   $('upcoming').innerHTML = list.length
     ? `<h2 class="sub-head">다가오는 일정</h2><ul class="up-list">${list.map((ev) => `
-      <li class="up cat-${ev.cat}" data-k="${ev.date}">
+      <li class="up cat-${ev.cat}" data-k="${ev.date}" tabindex="0" role="button">
         <span class="dday">${dday(ev.date)}</span>
         <span class="up-body"><span class="up-title">${esc(ev.title)}</span>
           <span class="up-sub">${mdw(ev.date)}${ev.time ? ` ${ev.time}` : ''} · ${CATS[ev.cat].label}</span></span>

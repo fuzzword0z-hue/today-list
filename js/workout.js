@@ -2,13 +2,17 @@
 
 /* ═════════════════ 운동 ═════════════════
  * state.workout  = { date, touched, c: { back: [n, n, n], shoulder: [n, n, n], plank: n, side: n,
- *                                        rt: { ex20, chores, shower }, rounds: n, period: n, bike: n } }
+ *                                        rt: { ex20, chores, shower }, rounds: n, period: n, bike: n,
+ *                                        sq: n, rows: [{ s, e, t }] } }
+ *   sq = 식후 스쿼트 칸 수 (한 칸 10회), rows = 주말 운동 / 평일 '그 밖의 운동' [시작 ~ 끝 + 내용]
  *   지금 체크해 둔 상태. date = 이 체크를 기록할 날 (위 '기록 날짜'), touched = 마지막으로 만진 날.
  *   touched가 오늘이 아니면 '지난 날 체크가 남아 있음' → 기록·지우기·이어서 중에 고르기 전까지 칸을 잠근다.
  *   rounds / period / bike = 20분 운동 버전별 진행 칸 수
  * state.w20v = 'v1' | 'period' | 'bike'   고른 20분 운동 버전 (체크를 지워도 유지)
+ * state.sqGoal = 하루 스쿼트 목표 (10–100회, 10회씩. 기본 50 = 5칸)
  * state.workouts = { 'YYYY-MM-DD': { back, shoulder, plank, side, full, ex20, w20v, chores, shower,
- *                                    rounds, period, bike, routine, at } }
+ *                                    rounds, period, bike, routine, sq, rows, xmin, at } }
+ *   sq = 스쿼트 횟수, rows = 적은 운동 줄, xmin = 그 줄들의 시간(분)
  *   '오늘 운동 완료'로 남긴 그날 기록. 등·어깨·사이드 플랭크는 총 횟수, 플랭크는 총 초, bike는 분.
  *   routine = 8:30–9:30 루틴 세 가지를 모두 체크한 날. 캘린더·목록에는 쓰지 않고 리포트에만 쓴다. */
 
@@ -78,6 +82,23 @@ const W20 = {
 };
 const w20v = () => (W20[state.w20v] ? state.w20v : 'v1');
 
+/* 식후 스쿼트: 한 칸 10회, 목표만큼 칸 (처음 50회 = 5칸, 익숙해지면 10회씩 늘려 100회까지) */
+const SQ_STEP = 10;
+const sqGoal = () => Math.min(100, Math.max(SQ_STEP, Math.round((state.sqGoal || 50) / SQ_STEP) * SQ_STEP));
+const sqCells = () => sqGoal() / SQ_STEP;
+/* 주말 운동 / 그 밖의 운동 줄: 적은 마지막 줄 다음에 빈 줄 하나 (2줄부터 8줄까지) */
+const XROWS_MIN = 2;
+const XROWS_MAX = 8;
+const xRowsOf = (c, n) => Array.from({ length: n || Math.min(XROWS_MAX, Math.max(XROWS_MIN, (c.rows || []).length)) },
+  (_, i) => ({ s: '', e: '', t: '', ...((c.rows || [])[i] || {}) }));
+function xRowsShown(c) {
+  const rows = xRowsOf(c);
+  const last = rows.reduce((a, r, i) => (r.s || r.e || r.t ? i : a), -1);
+  return xRowsOf(c, Math.min(XROWS_MAX, Math.max(XROWS_MIN, last + 2)));
+}
+const xRowsDone = (rows) => (rows || []).filter((r) => (r.t || '').trim() || rowMin(r)).map((r) => ({ s: r.s || '', e: r.e || '', t: (r.t || '').trim() }));
+let xOpen = null; // 평일 '그 밖의 운동' 펼침 (null = 적은 게 있으면 펼침)
+
 const fmtSec = (s) => (s < 60 ? `${s}초` : `${Math.floor(s / 60)}분${s % 60 ? ` ${s % 60}초` : ''}`);
 const exAmount = (ex, v) => (ex.sec ? fmtSec(v) : `${v}회`);
 const exMax = (ex) => (ex.sets ? ex.sets * ex.reps : ex.steps * ex.step);
@@ -93,7 +114,8 @@ function exCount(ex, c) {
   return (v || 0) * ex.step;
 }
 function cellsOn(ex, c) { return ex.sets ? exCount(ex, c) : c[ex.id] || 0; }
-const hasChecks = (c) => EXERCISES.some((ex) => cellsOn(ex, c)) || ROUTINE.some((r) => rtOf(c)[r.id]) || Object.values(W20).some((w) => c[w.key]);
+const hasChecks = (c) => EXERCISES.some((ex) => cellsOn(ex, c)) || ROUTINE.some((r) => rtOf(c)[r.id]) || Object.values(W20).some((w) => c[w.key])
+  || (c.sq || 0) > 0 || (c.rows || []).some((r) => r.s || r.e || (r.t || '').trim());
 
 /* 지금 체크 상태 → 기록 */
 function woSnapshot(c) {
@@ -101,14 +123,21 @@ function woSnapshot(c) {
   for (const ex of EXERCISES) rec[ex.id] = exCount(ex, c);
   rec.full = EXERCISES.every((ex) => rec[ex.id] >= exMax(ex)) ? 1 : 0;
   for (const r of ROUTINE) rec[r.id] = rtOf(c)[r.id] ? 1 : 0;
-  rec.w20v = rec.ex20 ? w20v() : '';
+  // 20분 운동 버전: 진행 칸을 채운 버전 (지금 열어 둔 버전에 진행이 없으면 진행이 있는 쪽)
+  const done20 = Object.keys(W20).filter((id) => c[W20[id].key]);
+  rec.w20v = rec.ex20 ? (done20.length && !done20.includes(w20v()) ? done20[0] : w20v()) : '';
   rec.rounds = c.rounds || 0;
   rec.period = c.period || 0;
   rec.bike = (c.bike || 0) * W20.bike.unit;
   rec.routine = ROUTINE.every((r) => rec[r.id]) ? 1 : 0;
+  rec.sq = Math.min(c.sq || 0, sqCells()) * SQ_STEP;
+  rec.rows = xRowsDone(c.rows);
+  rec.xmin = rec.rows.reduce((a, r) => a + rowMin(r), 0);
   return rec;
 }
-const sameRecord = (a, b) => !!a && !!b && Object.keys(a).every((k) => k === 'at' || a[k] === b[k] || (!a[k] && !b[k]));
+const emptyVal = (v) => !v || (Array.isArray(v) && !v.length);
+const sameRecord = (a, b) => !!a && !!b && Object.keys(a).every((k) => k === 'at'
+  || (emptyVal(a[k]) && emptyVal(b[k])) || JSON.stringify(a[k]) === JSON.stringify(b[k]));
 
 /* 기록 날짜와 '지난 날 체크가 남아 있음' */
 const woTouched = () => state.workout.touched || state.workout.date;
@@ -130,6 +159,8 @@ function recordToChecks(rec) {
   c.rounds = rec.rounds || 0;
   c.period = rec.period || 0;
   c.bike = Math.round((rec.bike || 0) / W20.bike.unit);
+  c.sq = Math.round((rec.sq || 0) / SQ_STEP);
+  c.rows = (rec.rows || []).map((r) => ({ ...r }));
   return c;
 }
 
@@ -141,13 +172,16 @@ function renderWorkout() {
   const all = EXERCISES.reduce((a, ex) => a + exCells(ex), 0);
   const weekday = dayMode(k) === 'weekday';
   const stale = woStale();
-  $('wo-date').textContent = `${mdw(today)}${dayMode(today) === 'weekday' ? '' : ' · 쉬는 날'}`;
+  // 머리에는 기록 날짜 (지난 날을 고쳐 쓰는 중이면 그 날)
+  $('wo-date').textContent = `${mdw(k)}${k === today ? '' : ' 기록'}${weekday ? '' : ' · 쉬는 날'}`;
   $('wo-total').textContent = `스트레칭 ${on} / ${all}칸`;
   $('view-workout').classList.toggle('locked', stale);
   $('wo-recdate').innerHTML = stale ? '' : recDateRow(k);
   const recText = (r) => [
     r.ex20 ? `20분 운동${r.w20v && r.w20v !== 'v1' ? `(${W20[r.w20v].label})` : ''} ✓` : '',
     r.routine ? '8:30 루틴 ✓' : '',
+    r.rows && r.rows.length ? `적은 운동 ${r.rows.length}개${r.xmin ? ` ${fmtMin(r.xmin)}` : ''}` : '',
+    r.sq ? `스쿼트 ${r.sq}회` : '',
     ...EXERCISES.filter((ex) => r[ex.id]).map((ex) => `${ex.name} ${exAmount(ex, r[ex.id])}`),
   ].filter(Boolean).join(' · ');
   // 지난 날 체크가 남아 있으면: 그 날로 기록 / 지우기 / 오늘 것으로 이어서 중에 고르기
@@ -162,9 +196,10 @@ function renderWorkout() {
     </div>`
     : rec ? `<div class="wo-banner done"><b>${k === today ? '오늘' : md(k)} 운동을 기록했어요</b><span>${recText(rec)}</span></div>` : '';
 
-  // 평일 8:30–9:30 루틴 + 20분 운동
+  // 평일: 8:30–9:30 루틴 + 20분 운동 + 식후 스쿼트 + 그 밖의 운동 / 쉬는 날: 주말 운동 + 식후 스쿼트
   const rt = rtOf(c);
-  $('wo-routine').innerHTML = weekday ? `
+  const ro = stale ? ' readonly' : '';
+  $('wo-routine').innerHTML = !weekday ? `${xRowsCard(c, false, ro)}${sqCard(c, false)}<h2 class="sub-head wo-sub">스트레칭</h2>` : `
     <section class="wo-card rt-card">
       <div class="wo-head"><span class="wo-name">8:30–9:30 루틴</span><span class="wo-target">평일</span>
         <span class="wo-amt">${ROUTINE.filter((r) => rt[r.id]).length} / ${ROUTINE.length}</span></div>
@@ -176,7 +211,10 @@ function renderWorkout() {
       </ul>
     </section>
     ${w20Card(c)}
-    <h2 class="sub-head wo-sub">스트레칭</h2>` : '';
+    ${sqCard(c, true)}
+    ${xRowsCard(c, true, ro)}
+    <h2 class="sub-head wo-sub">스트레칭</h2>`;
+  growAll($('wo-routine'));
 
   $('wo-list').innerHTML = EXERCISES.map((ex) => {
     const amt = exCount(ex, c);
@@ -228,6 +266,38 @@ function w20Card(c) {
   </section>`;
 }
 
+/* 식후 스쿼트: 한 칸 10회, 목표는 −/+로 10회씩 */
+function sqCard(c, weekday) {
+  const n = sqCells();
+  const filled = Math.min(c.sq || 0, n);
+  const full = filled >= n;
+  return `<section class="wo-card sq-card${full ? ' full' : ''}">
+    <div class="wo-head"><span class="wo-name">식후 스쿼트</span><span class="wo-target">${weekday ? '점심 먹고' : '식사 후'} · 한 칸 10회</span>
+      <span class="wo-amt">${filled ? `${filled * SQ_STEP}회` : ''}${full ? ' ✓' : ''}</span></div>
+    <div class="wo-row"><div class="wo-cells wide" style="--n:${n}" data-ex="sq">${cellsHtml(n, filled, (i) => i * SQ_STEP, (i) => `스쿼트 ${i * SQ_STEP}회`)}</div></div>
+    <div class="sq-goal">하루 목표
+      <span class="h-step" data-sqgoal><button type="button" data-d="-1" aria-label="목표 10회 줄이기">−</button><b>${sqGoal()}</b><button type="button" data-d="1" aria-label="목표 10회 늘리기">+</button></span>회
+    </div>
+  </section>`;
+}
+
+/* 주말 운동 (쉬는 날) / 그 밖의 운동 (평일, 접힘): [시작 ~ 끝 + 내용] 줄 */
+function xRowsCard(c, weekday, ro) {
+  const rows = xRowsShown(c);
+  const min = rows.reduce((a, r) => a + rowMin(r), 0);
+  const has = rows.some((r) => r.s || r.e || r.t);
+  const open = !weekday || (xOpen === null ? has : xOpen);
+  const ph = (i) => (i ? '운동 내용' : weekday ? '운동 내용 (예: 퇴근 후 걷기)' : '운동 내용 (예: 점심 먹고 걷기)');
+  const head = `<span class="wo-name">${weekday ? '그 밖의 운동' : '주말 운동'}</span>
+    <span class="wo-target">${weekday ? '퇴근 후 걷기 등' : '시간 고르고 내용 적기'}</span>
+    <span class="wo-amt" id="x-total">${min ? fmtMin(min) : ''}</span>`;
+  return `<section class="wo-card x-card">
+    ${weekday ? `<button class="x-head" aria-expanded="${open}">${head}<svg class="cond-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>`
+    : `<div class="wo-head">${head}</div>`}
+    ${open ? `<div class="x-rows" id="x-rows">${rows.map((r, i) => timeRowHtml(r, i, ro, ph(i))).join('')}</div>` : ''}
+  </section>`;
+}
+
 function cellsHtml(n, filled, label, aria) {
   let h = '';
   for (let i = 1; i <= n; i++) {
@@ -251,6 +321,12 @@ function onCell(e) {
   const box = b.parentElement;
   const i = +b.dataset.i;
   const c = { ...woChecks() };
+  if (box.dataset.ex === 'sq') {
+    const cur = Math.min(c.sq || 0, sqCells());
+    c.sq = cur === i ? i - 1 : i;
+    setWorkout(c);
+    return;
+  }
   if (box.dataset.ex === 'w20') {
     const key = box.dataset.key;
     const W = Object.values(W20).find((w) => w.key === key);
@@ -275,6 +351,14 @@ function onCell(e) {
 $('wo-list').addEventListener('click', onCell);
 $('wo-routine').addEventListener('click', (e) => {
   if (e.target.closest('.w20-head')) { w20Open = !w20Open; renderWorkout(); return; }
+  if (e.target.closest('.x-head')) { xOpen = e.target.closest('.x-head').getAttribute('aria-expanded') !== 'true'; renderWorkout(); return; }
+  const g = e.target.closest('[data-sqgoal] [data-d]');
+  if (g) {
+    state.sqGoal = Math.min(100, Math.max(SQ_STEP, sqGoal() + +g.dataset.d * SQ_STEP));
+    save();
+    renderWorkout();
+    return;
+  }
   const ver = e.target.closest('[data-w20]');
   if (ver) { state.w20v = ver.dataset.w20; save(); renderWorkout(); return; }
   const item = e.target.closest('[data-rt]');
@@ -287,6 +371,26 @@ $('wo-routine').addEventListener('click', (e) => {
     return;
   }
   onCell(e);
+});
+
+/* 주말 운동·그 밖의 운동 줄: 글자를 칠 때마다 저장 (다시 그리지 않아 입력이 끊기지 않게) */
+$('wo-routine').addEventListener('input', (e) => {
+  const f = e.target.dataset.f;
+  const row = e.target.closest('.st-row');
+  const box = $('x-rows');
+  if (!f || !row || !box || woStale()) return;
+  const n = box.children.length;
+  const c = { ...woChecks() };
+  const rows = xRowsOf(c, n);
+  const i = +row.dataset.i;
+  rows[i][f] = e.target.value;
+  c.rows = rows;
+  state.workout = { date: woRecDate(), touched: today, c };
+  saveSoon();
+  const m = rows.reduce((a, r) => a + rowMin(r), 0);
+  $('x-total').textContent = m ? fmtMin(m) : '';
+  // 마지막 줄을 쓰기 시작하면 빈 줄을 하나 더
+  if (i === n - 1 && n < XROWS_MAX && (rows[i].s || rows[i].e || rows[i].t)) box.insertAdjacentHTML('beforeend', timeRowHtml({}, n, '', '운동 내용'));
 });
 
 /* 기록은 체크한 날짜로 남긴다 (어제 체크를 오늘 완료해도 어제 기록) */

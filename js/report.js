@@ -123,7 +123,7 @@ function analyze(id) {
 
   // 케어: 반복(투약)은 예정 대비 기록, 반복 없는 케어(진료)는 다녀온 횟수
   // (이 날만 바꾼 회차는 원래 반복 일정의 투약으로 센다)
-  // ('못 먹임'으로 남긴 날은 기록한 것으로, 체크가 아예 없는 날만 '기록 없음'으로 센다)
+  // ('못 함'으로 남긴 날은 기록한 것으로, 체크가 아예 없는 날만 '기록 없음'으로 센다)
   m.care = state.events.filter((ev) => isDose(ev) && ev.rep).map((ev) => {
     const c = { ev, sched: 0, given: 0, skipped: [], missed: [] };
     for (const d of seriesDays(ev, start, last)) {
@@ -156,8 +156,12 @@ function analyze(id) {
   m.cond = cd;
 
   // 운동 ('오늘 운동 완료'로 남긴 기록). 비율은 처음 운동을 기록한 날부터 센다
-  // '운동한 날' = 20분 운동·실내자전거·스트레칭 중 하나라도 한 날 (집안일·샤워만 체크한 날은 빼고)
-  const wo = { days: 0, full: 0, ex20: 0, v20: {}, bike: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null };
+  // '운동한 날' = 20분 운동·실내자전거·적은 운동(주말·그 밖의 운동)·스트레칭 중 하나라도 한 날
+  // (집안일·샤워만, 스쿼트만 한 날은 빼고 — 식후 스쿼트는 따로 센다)
+  const wo = {
+    days: 0, full: 0, ex20: 0, v20: {}, bike: 0, span: 0, sum: {}, cnt: {}, months: yearly ? Array(12).fill(0) : null,
+    x: { days: 0, min: 0, entries: [] }, sq: { days: 0, sum: 0, max: 0 },
+  };
   for (const ex of EXERCISES) { wo.sum[ex.id] = 0; wo.cnt[ex.id] = 0; }
   const firstWo = Object.keys(state.workouts).sort()[0];
   if (firstWo && firstWo <= last) {
@@ -165,7 +169,11 @@ function analyze(id) {
     wo.span = diffDays(last, from) + 1;
     for (let k = from; k <= last; k = addDays(k, 1)) {
       const r = state.workouts[k];
-      if (!r || !(r.ex20 || r.bike || EXERCISES.some((ex) => r[ex.id]))) continue;
+      if (!r) continue;
+      if (r.sq) { wo.sq.days++; wo.sq.sum += r.sq; wo.sq.max = Math.max(wo.sq.max, r.sq); }
+      const rows = r.rows || [];
+      if (rows.length) { wo.x.days++; wo.x.min += r.xmin || 0; wo.x.entries.push({ k, rows }); }
+      if (!(r.ex20 || r.bike || rows.length || EXERCISES.some((ex) => r[ex.id]))) continue;
       wo.days++;
       if (r.full) wo.full++;
       if (r.ex20) {
@@ -361,7 +369,7 @@ function feedback(m, p) {
   for (const c of care) {
     if (!c.missed.length) continue;
     const list = c.missed.slice(0, 4).map(ml).join(', ') + (c.missed.length > 4 ? ` 외 ${c.missed.length - 4}일` : '');
-    fix.push(`${c.ev.title} 기록이 빠진 날이 ${c.missed.length}일 있어요 (${list}). 먹인 직후 바로 체크하면 놓치지 않아요.`);
+    fix.push(`${c.ev.title} 기록이 빠진 날이 ${c.missed.length}일 있어요 (${list}). 챙긴 직후 바로 체크하면 놓치지 않아요.`);
     goals.push(`${c.ev.title} 체크 100%`);
   }
   if (m.open >= 5) fix.push(`끝내지도, 미루지도 않고 남은 일이 ${m.open}개예요. 하루를 마칠 때 남은 일은 '내일로' 넘기거나 지워서 정리해 주세요.`);
@@ -411,7 +419,7 @@ function renderReport(id) {
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
   const [hlSec, hlLines] = healthSection(m.hl, m.yearly);
-  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.st.days && !hlSec)) {
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -437,7 +445,7 @@ function renderReport(id) {
     tiles.push(['최장 연속', `${m.streakBest}<small>일</small>`, '']);
     tiles.push(['미룬 일', `${m.moved}<small>개</small>`, '']);
   }
-  for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, c.skipped.length ? `<small>못 먹임 ${c.skipped.length}회</small>` : '']);
+  for (const c of m.care) tiles.push([c.ev.title, `${c.given}<small>/${c.sched}회</small>`, c.skipped.length ? `<small>못 함 ${c.skipped.length}회</small>` : '']);
   if (m.visits.length) tiles.push(['진료', `${m.visits.filter((v) => v.done).length}<small>회</small>`, '']);
   if (m.cond.days) tiles.push(['컨디션 기록', `${m.cond.days}<small>일</small>`, m.cond.sym ? `<small>이상 ${m.cond.sym}일</small>` : '']);
   if (m.cond.th) tiles.push(['고양이 양치', `${m.cond.th}<small>/${m.days}일</small>`, '']);
@@ -453,8 +461,10 @@ function renderReport(id) {
   // 운동 (리포트에만 나오는 기록)
   let woSec = '';
   const woLines = [];
-  if (m.wo.days) {
+  if (m.wo.days || m.wo.sq.days) {
     const wt = [['운동한 날', `${m.wo.days}<small>/${m.wo.span}일</small>`, m.wo.full ? `<small>스트레칭 다 채운 날 ${m.wo.full}일</small>` : '']];
+    if (m.wo.x.days) wt.push(['주말·그 밖의 운동', `${m.wo.x.days}<small>일</small>`, m.wo.x.min ? `<small>${fmtMin(m.wo.x.min)}</small>` : '']);
+    if (m.wo.sq.days) wt.push(['식후 스쿼트', `${m.wo.sq.days}<small>일</small>`, `<small>평균 ${Math.round(m.wo.sq.sum / m.wo.sq.days)}회 · 최고 ${m.wo.sq.max}회</small>`]);
     if (m.wo.ex20) {
       const by = Object.entries(W20).filter(([id]) => m.wo.v20[id]).map(([id, w]) => `${w.label} ${m.wo.v20[id]}`);
       wt.push(['20분 운동', `${m.wo.ex20}<small>일</small>`, by.length > 1 || !m.wo.v20.v1 ? `<small>${by.join(' · ')}</small>` : '']);
@@ -465,13 +475,19 @@ function renderReport(id) {
       wt.push([ex.name, esc(exAmount(ex, m.wo.sum[ex.id])), `<small>한 날 평균 ${exAmount(ex, Math.round(m.wo.sum[ex.id] / m.wo.cnt[ex.id]))}</small>`]);
     }
     for (const [l, v, d] of wt) woLines.push(`- ${l}: ${v.replace(/<[^>]+>/g, '')}${d ? ` (${d.replace(/<[^>]+>/g, '')})` : ''}`);
+    // 적은 운동 내역 (월간만)
+    const xLine = ({ k, rows }) => `${ml(k)} (${WD[parse(k).getDay()]}) ${rows.map((r) => `${r.s && r.e ? `${hm(r.s)}–${hm(r.e)} ` : ''}${r.t}`.trim()).join(' / ')}`;
+    const xList = !m.yearly && m.wo.x.entries.length
+      ? `<details class="r-week"><summary>적은 운동 ${m.wo.x.entries.length}일${m.wo.x.min ? ` · ${fmtMin(m.wo.x.min)}` : ''}</summary>
+        <ul>${m.wo.x.entries.map((en) => `<li>${esc(xLine(en))}</li>`).join('')}</ul></details>` : '';
+    if (xList) woLines.push('', '적은 운동', ...m.wo.x.entries.map((en) => `- ${xLine(en)}`));
     const chart = m.yearly ? `<h3 class="r-sub">월별 운동한 날</h3><div class="r-months">${m.wo.months.map((n, i) => {
       const dim = new Date(+id, i + 1, 0).getDate();
       return `<div class="r-mcol"><span class="r-mval">${n || ''}</span><span class="r-mbar"><i style="height:${n ? Math.max(2, Math.round((n / dim) * 100)) : 0}%"></i></span><span class="r-mlab">${i + 1}</span></div>`;
     }).join('')}</div>` : '';
     woSec = `<section class="r-sec"><h2>운동</h2>
       <div class="r-tiles">${wt.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>
-      ${chart}
+      ${chart}${xList}
       <p class="r-tip">운동 탭의 '오늘 운동 완료'로 남긴 기록이에요. 처음 기록한 날부터 세요.</p></section>`;
   }
 

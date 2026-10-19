@@ -114,13 +114,22 @@ function renderCarePrompts() {
       <button class="cp-btn yes" data-rec="done">${K.yes}</button>
       <button class="cp-btn" data-rec="skip">${K.no}</button>
     </div>`;
-  }).join('');
+  }).join('') + (list.length >= 2 && carePromptsOpen
+    ? `<div class="care-all"><button class="cp-btn yes" id="care-all">${list.length}개 모두 했어요</button></div>` : '');
 }
 
 $('care-prompts').addEventListener('click', (e) => {
   if (e.target.closest('#care-group')) {
     carePromptsOpen = !carePromptsOpen;
     renderCarePrompts();
+    return;
+  }
+  // 빠진 체크를 한 번에 '했어요'로 (실행 취소 가능)
+  if (e.target.closest('#care-all')) {
+    const list = missingCare();
+    undoable(`케어 체크 ${list.length}개를 했어요로 기록했어요`, () => {
+      for (const { ev, k } of list) setCareRecord(state.events.find((x) => x.id === ev.id), k, 'done');
+    });
     return;
   }
   const b = e.target.closest('[data-rec]');
@@ -162,10 +171,10 @@ function renderCond() {
         ${x.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${!!c && c[x.f] === v}" class="${x.bad.includes(v) ? 'bad' : ''}">${l}</button>`).join('')}
       </div></div>`).join('')}
       <div class="cond-row"><span class="cond-label">체중</span>
-        <input class="cond-w" id="cond-w" type="number" inputmode="decimal" step="0.01" min="0" max="30" placeholder="0.00" value="${c && c.w ? c.w : ''}"><span class="cond-unit">kg</span>
+        <input class="cond-w" id="cond-w" aria-label="고양이 체중" type="number" inputmode="decimal" step="0.01" min="0" max="30" placeholder="0.00" value="${c && c.w ? c.w : ''}"><span class="cond-unit">kg</span>
         ${lastWeight(k) ? `<span class="cond-prev">지난 ${fmtKg(lastWeight(k).w)} (${ml(lastWeight(k).k)})</span>` : ''}
       </div>
-      <textarea class="cond-memo" id="cond-memo" rows="2" maxlength="500" placeholder="메모 (먹은 양, 약 반응, 특이 사항 등)">${c && c.n ? esc(c.n) : ''}</textarea>
+      <textarea class="cond-memo" id="cond-memo" aria-label="고양이 컨디션 메모" rows="2" maxlength="500" placeholder="메모 (먹은 양, 약 반응, 특이 사항 등)">${c && c.n ? esc(c.n) : ''}</textarea>
       <p class="cond-help">고른 항목을 한 번 더 누르면 지워져요. 진료 전 요약과 월간 리포트에 쓰여요.</p>
     </div>` : ''}`;
 }
@@ -176,13 +185,13 @@ function lastWeight(before) {
   return k ? { k, w: state.cond[k].w } : null;
 }
 
-function setCond(k, f, v) {
+function setCond(k, f, v, typing = false) {
   const c = { ...(state.cond[k] || {}) };
   if (v === undefined || v === null || v === '') delete c[f];
   else c[f] = v;
   if (Object.keys(c).length) state.cond[k] = c;
   else delete state.cond[k];
-  save();
+  if (typing) saveSoon(); else save();
 }
 
 $('cond').addEventListener('click', (e) => {
@@ -216,7 +225,7 @@ $('cond').addEventListener('input', (e) => {
     const w = parseFloat(e.target.value);
     setCond(ui.date, 'w', w > 0 && w < 30 ? Math.round(w * 100) / 100 : null);
   } else if (e.target.id === 'cond-memo') {
-    setCond(ui.date, 'n', e.target.value.trim() || null);
+    setCond(ui.date, 'n', e.target.value.trim() || null, true);
   } else return;
   updateCondHead();
 });
@@ -238,7 +247,7 @@ function careSummaryData() {
   const to = today;
   const days = diffDays(to, from) + 1;
 
-  // 투약: 반복 투약별로 먹임 / 못 먹임 / 기록 없음 (오늘 회차는 체크 전이면 빼고 센다)
+  // 투약: 반복 투약별로 함 / 못 함 / 기록 없음 (오늘 회차는 체크 전이면 빼고 센다)
   const doses = state.events.filter((ev) => isDose(ev) && ev.rep).map((ev) => {
     const r = { ev, sched: 0, given: 0, skipped: [], missing: [] };
     for (const d of seriesDays(ev, from, to)) {
@@ -281,8 +290,8 @@ function renderCareSummary() {
   // 투약
   if (s.doses.length) {
     const items = s.doses.map((r) => {
-      const t = `${r.ev.title} (${repLabel(r.ev.rep)}): ${r.sched}회 중 ${r.given}회 먹임`
-        + (r.skipped.length ? ` · 못 먹임 ${r.skipped.length}회 (${dl(r.skipped)})` : '')
+      const t = `${r.ev.title} (${repLabel(r.ev.rep)}): ${r.sched}회 중 ${r.given}회 했음`
+        + (r.skipped.length ? ` · 못 함 ${r.skipped.length}회 (${dl(r.skipped)})` : '')
         + (r.missing.length ? ` · 기록 없음 ${r.missing.length}회 (${dl(r.missing)})` : '');
       return t;
     });
@@ -333,7 +342,28 @@ function renderCareSummary() {
         <span class="up-body"><span class="up-title">${esc(s.next.ev.title)}</span>
         <span class="up-sub">${mdw(s.next.k)}${s.next.ev.time ? ` ${s.next.ev.time}` : ''}${s.next.ev.memo ? ` · ${esc(s.next.ev.memo)}` : ''}</span></span></li></ul></section>` : ''}
     ${sec.map(([h, items]) => `<section class="r-sec cs"><h2>${h}</h2><ul>${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>`).join('')}
+    ${s.weights.length >= 2 ? `<section class="r-sec cs"><h2>체중 추이</h2>${weightChart(s.weights)}</section>` : ''}
     <p class="r-note">'텍스트 복사'로 복사해서 병원에 보여 주거나 메모에 붙여 넣을 수 있어요.</p>`;
+}
+
+/* 체중 추이 (지난 진료 이후): 날짜 간격대로 점을 찍고 잇는다. 처음·마지막·가장 낮은 값에 숫자 */
+function weightChart(ws) {
+  const W = 300, H = 110, P = 18;
+  const d0 = ws[0].k, span = Math.max(1, diffDays(ws[ws.length - 1].k, d0));
+  const vals = ws.map((x) => x.w);
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = Math.max(0.05, (hi - lo) * 0.15);
+  const x = (k) => P + ((W - P * 2) * diffDays(k, d0)) / span;
+  const y = (w) => P + (H - P * 2) * (1 - (w - (lo - pad)) / (hi - lo + pad * 2));
+  const pts = ws.map((p) => [x(p.k), y(p.w)]);
+  const minI = vals.indexOf(lo);
+  const label = (i) => `<text x="${pts[i][0]}" y="${pts[i][1] - 7}" text-anchor="${i === 0 ? 'start' : i === ws.length - 1 ? 'end' : 'middle'}">${ws[i].w}</text>`;
+  const labels = [...new Set([0, ws.length - 1, minI])].map(label).join('');
+  return `<svg class="w-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="체중 ${ws.map((p) => `${ml(p.k)} ${p.w}kg`).join(', ')}">
+    <polyline points="${pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ')}"/>
+    ${pts.map((p) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3"/>`).join('')}
+    ${labels}
+    <text class="w-date" x="${P}" y="${H - 2}">${ml(ws[0].k)}</text><text class="w-date" x="${W - P}" y="${H - 2}" text-anchor="end">${ml(ws[ws.length - 1].k)}</text>
+  </svg>`;
 }
 
 function openCareSummary() { go('report', { push: true, id: 'care' }); }

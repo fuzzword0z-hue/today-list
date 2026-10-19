@@ -15,12 +15,12 @@
  * 수치를 좋다·나쁘다로 판단하지 않고, 기록과 지난번 대비 변화만 보여 준다. */
 
 const H_ITEMS = [
-  { id: 'snack', label: '과자 먹음', short: '과자', why: 'snackWhy', ask: '이유',
+  { id: 'snack', label: '과자 먹음', short: '과자', main: '과자', sub: '먹음', why: 'snackWhy', ask: '이유',
     opts: [['stress', '스트레스'], ['tired', '피곤'], ['bored', '지루함'], ['hungry', '배고픔']] },
-  { id: 'food', label: '주의 음식 먹음', short: '주의 음식', why: 'foods', ask: '무엇', multi: true,
+  { id: 'food', label: '주의 음식 먹음', short: '주의 음식', main: '주의 음식', sub: '먹음', why: 'foods', ask: '무엇', multi: true,
     opts: [['bread', '빵'], ['ramen', '라면'], ['gimbap', '김밥'], ['fried', '튀김']] },
-  { id: 'veg', label: '야채 먼저 안 먹음', short: '야채' },
-  { id: 'late', label: '어젯밤 11:30 넘어 잠', short: '늦게 잠', why: 'lateWhy', ask: '이유', night: true,
+  { id: 'veg', label: '야채 먼저 안 먹음', short: '야채', main: '야채 먼저', sub: '안 먹음' },
+  { id: 'late', label: '어젯밤 11:30 넘어 잠', short: '늦게 잠', main: '늦게 잠', sub: '어젯밤', why: 'lateWhy', ask: '이유', night: true,
     opts: [['work', '일'], ['phone', '핸드폰'], ['awake', '잠이 안 옴']] },
 ];
 const H_WEEKLY = ['snack', 'veg', 'late']; // 주 n회 이하가 목표인 항목
@@ -105,31 +105,37 @@ function renderHealth() {
   const cnt = hWeekCount(k);
   const thisWeek = weekStart(k) === weekStart(today);
 
-  // 머리: 그날 안 지킨 것 요약 (진료 날이면 먼저 알려 줌)
-  const next = nextLabVisit();
-  const on = H_ITEMS.filter((it) => hOn(it.id, hDay(it, k)));
-  let sum = on.length ? on.map((it) => it.short).join(' · ') : k === today ? '안 지킨 것만 눌러요' : '다 지켰어요';
+  // 머리: 이번 주 예외 횟수 / 목표 (진료가 가까우면 먼저 알려 줌)
+  const stats = H_WEEKLY.map((id) => `<span class="${cnt[id] > goal[id] ? 'over' : ''}">${hItem(id).short} <b>${cnt[id]}</b>/${goal[id]}</span>`).join(' · ');
+  let sum = `${thisWeek ? '' : '그 주 '}${stats}`;
   let alert = false;
+  const next = nextLabVisit();
   if (next && k === today && !state.labs[today]) {
     const n = diffDays(next, today);
     if (n <= 0) { sum = n === 0 ? '오늘 진료 · 수치 적기' : '진료 수치 적기'; alert = true; } else if (n <= 7) sum = `진료 D-${n} · ${sum}`;
   }
 
-  // 이번 주 숫자
+  // 버튼 아래 작은 글씨: 고른 이유 / 주의 음식은 마지막으로 먹은 지 며칠
   const lf = lastFood(k);
   const gap = lf ? diffDays(k, lf) : null;
-  const stat = (id) => {
-    const n = cnt[id];
-    return `<span class="h-stat${n > goal[id] ? ' over' : ''}">${hItem(id).short} <b>${n}</b>/${goal[id]}</span>`;
+  const sub = (it) => {
+    const h = state.health[hDay(it, k)] || {};
+    if (h[it.id] && it.why) {
+      const v = it.multi ? (h[it.why] || []).map((x) => optLabelOf(it, x)).join('·') : optLabelOf(it, h[it.why]);
+      if (v) return v;
+    }
+    if (it.id === 'food' && !h.food && lf) return `<span class="${gap < goal.food ? 'wait' : ''}">D+${gap}</span>`;
+    return it.sub;
   };
-  const foodStat = lf
-    ? `<span class="h-stat${gap < goal.food ? ' wait' : ''}">주의 음식 <b>D+${gap}</b></span>`
-    : '<span class="h-stat">주의 음식 <b>–</b></span>';
 
-  const whyRows = H_ITEMS.filter((it) => it.opts && hOn(it.id, hDay(it, k))).map((it) => {
+  // 이유 고르기: 아직 고르지 않은 것만 (펼치면 전부)
+  const whyRows = H_ITEMS.filter((it) => it.opts && hOn(it.id, hDay(it, k))).filter((it) => {
+    const v = state.health[hDay(it, k)][it.why];
+    return open || it.multi || !v; // 여러 개 고르는 주의 음식은 계속 보여 준다
+  }).map((it) => {
     const h = state.health[hDay(it, k)];
     const cur = it.multi ? h[it.why] || [] : [h[it.why]];
-    return `<div class="cond-row h-why"><span class="cond-label">${it.short === '주의 음식' ? '음식' : it.short}</span>
+    return `<div class="cond-row h-why"><span class="cond-label">${it.main}</span>
       <div class="chips" data-why="${it.id}">${it.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${cur.includes(v)}">${l}</button>`).join('')}</div></div>`;
   }).join('');
 
@@ -137,21 +143,18 @@ function renderHealth() {
     <button class="cond-head" aria-expanded="${open}">
       <span class="cond-ic h-ic">${HEART_SVG}</span>
       <span class="cond-title">내 건강</span>
-      <span class="cond-sum${alert ? ' h-alert' : ''}">${esc(sum)}</span>
+      <span class="cond-sum h-sum${alert ? ' h-alert' : ''}">${alert ? esc(sum) : sum}</span>
       <svg class="cond-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    <div class="h-week"><span class="h-wl">${thisWeek ? '이번 주' : '그 주'}</span>${H_WEEKLY.map(stat).join('')}${foodStat}</div>
-    <div class="h-grid">${H_ITEMS.map((it) => {
-      const d = hDay(it, k);
-      const pressed = hOn(it.id, d);
-      return `<button class="h-tg" data-h="${it.id}" aria-pressed="${pressed}">${it.label}</button>`;
+    <div class="h-row" role="group" aria-label="안 지킨 것만 누르기">${H_ITEMS.map((it) => {
+      const pressed = hOn(it.id, hDay(it, k));
+      return `<button class="h-tg" data-h="${it.id}" aria-pressed="${pressed}" aria-label="${it.label}"><b>${it.main}</b><small>${sub(it)}</small></button>`;
     }).join('')}</div>
     ${whyRows ? `<div class="h-whys">${whyRows}</div>` : ''}
-    ${lf && gap < goal.food ? `<p class="h-note">주의 음식은 ${ml(addDays(lf, goal.food))}부터 괜찮아요 (${goal.food}일에 한 번)</p>` : ''}
-    ${open ? healthBody(k) : ''}`;
+    ${open ? healthBody(k, lf, gap) : ''}`;
 }
 
-function healthBody(k) {
+function healthBody(k, lf, gap) {
   const goal = hGoal();
   const w = state.weights[k];
   const pw = weightBefore(k);
@@ -161,6 +164,7 @@ function healthBody(k) {
   const stepper = (f, unit) => `<span class="h-step" data-goal="${f}">
     <button type="button" data-d="-1" aria-label="줄이기">−</button><b>${goal[f]}</b><button type="button" data-d="1" aria-label="늘리기">+</button></span>${unit}`;
   return `<div class="cond-body h-body">
+    ${lf && gap < goal.food ? `<p class="h-note">주의 음식은 ${ml(addDays(lf, goal.food))}부터 괜찮아요 (${goal.food}일에 한 번)</p>` : ''}
     <div class="cond-row"><span class="cond-label">체중</span>
       <input class="cond-w" id="h-w" type="number" inputmode="decimal" step="0.1" min="20" max="200" placeholder="0.0" value="${w || ''}"><span class="cond-unit">kg</span>
       ${pw ? `<span class="cond-prev">지난 ${state.weights[pw]}kg (${ml(pw)})</span>` : '<span class="cond-prev">잴 수 있는 날에만</span>'}

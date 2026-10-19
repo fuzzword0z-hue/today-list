@@ -1,8 +1,8 @@
 'use strict';
 
-/* ───────── 자정이 지나면 '오늘'을 갱신 ───────── */
+/* ───────── 새벽 4시가 지나면 '오늘'을 갱신 (DAY_START_HOUR) ───────── */
 function refreshToday() {
-  const now = keyOf(new Date());
+  const now = todayKey();
   if (now === today) return;
   if (ui.date === today) ui.date = now;
   if (ui.calSel === today) { ui.calSel = now; ui.calMonth = monthStart(now); }
@@ -24,9 +24,21 @@ function fitViewport() {
     document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
     document.documentElement.style.setProperty('--vvt', `${vv.offsetTop}px`);
   }
-  const typing = document.activeElement && document.activeElement.matches('#new-task, .edit-input') && h < fullHeight - 120;
-  $('app').classList.toggle('typing', !!typing);
+  const el = document.activeElement;
+  const typing = !!el && el.matches(TYPING_FIELDS) && h < fullHeight - 120;
+  // 할 일 입력창이 아닌 칸(공부 줄, 메모, 시트 등)이면 아래 버튼·큰 제목도 숨긴다
+  const field = typing && !el.matches('#new-task, .edit-input');
+  $('app').classList.toggle('typing', typing);
+  $('app').classList.toggle('typing-field', field);
+  // 키보드가 올라온 뒤 입력 중인 칸이 가려지지 않게 (칸마다 한 번)
+  if (field && scrolledFor !== el) {
+    scrolledFor = el;
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  }
+  if (!typing) scrolledFor = null;
 }
+const TYPING_FIELDS = 'input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=button]), textarea';
+let scrolledFor = null;
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitViewport);
   window.visualViewport.addEventListener('scroll', fitViewport);
@@ -40,15 +52,24 @@ fitViewport();
 /* ───────── 오프라인 / 설치 ───────── */
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', () => {
-    // 새 버전으로 바뀌면 한 번 새로 고침 (서비스 워커가 직접 다시 열지 못하는 브라우저 대비).
-    // 처음 설치할 때는 이전 버전이 없으므로 새로 고치지 않는다.
+    // 새 버전이 준비되면 바로 새로 고치지 않고, 앱이 화면에서 내려갔을 때(다른 앱으로 가거나 화면을 끔) 새로 고친다.
+    // 입력 중인 시트·칸이 있으면 그다음 기회로 미룬다. 처음 설치할 때는 이전 버전이 없으므로 새로 고치지 않는다.
     const hadController = !!navigator.serviceWorker.controller;
+    let updateReady = false;
+    const busy = () => ['sheet', 'lab-sheet', 'choice'].some((id) => !$(id).hidden)
+      || (document.activeElement && document.activeElement.matches('input, textarea, select'));
+    const reloadIfIdle = () => { if (updateReady && document.hidden && !busy()) location.reload(); };
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController) setTimeout(() => location.reload(), 1500);
+      if (!hadController) return;
+      updateReady = true;
+      reloadIfIdle();
     });
     navigator.serviceWorker.register('sw.js').then((reg) => {
       // 홈 화면 앱은 며칠씩 열린 채로 남아 있으므로, 다시 볼 때마다 새 버전이 있는지 확인
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) reloadIfIdle();
+        else reg.update().catch(() => {});
+      });
     }).catch(() => {});
   });
 }

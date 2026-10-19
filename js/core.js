@@ -71,17 +71,77 @@ function save() {
   }
 }
 
-/* 되돌릴 수 있는 변경: 직전 상태를 통째로 기억해 두었다가 '실행 취소' 시 복원 */
-function undoable(msg, fn) {
-  const snap = JSON.stringify(state);
+/* 되돌릴 수 있는 변경.
+ * 실행 취소는 '이 변경으로 바뀐 곳'만 되돌린다. 토스트가 떠 있는 사이 다른 할 일을 체크하거나
+ * 새로 적은 것은 그대로 둔다 (상태를 통째로 되돌리면 그 사이 한 일까지 사라지므로).
+ * whole = true면 상태를 통째로 되돌린다 (백업 불러오기처럼 전체를 바꾼 경우). */
+function undoable(msg, fn, whole = false) {
+  const before = JSON.stringify(state);
   fn();
   save();
   render();
+  const after = JSON.stringify(state);
   toast(msg, () => {
-    state = JSON.parse(snap);
+    if (whole) state = JSON.parse(before);
+    else if (!revertChanges(JSON.parse(before), JSON.parse(after))) toast('그 사이 바뀌어서 되돌리지 못했어요');
     save();
     render();
   });
+}
+
+/* 순서와 상관없이 같은 값인지 */
+function stableStr(x) {
+  if (Array.isArray(x)) return `[${x.map(stableStr).join(',')}]`;
+  if (x && typeof x === 'object') return `{${Object.keys(x).sort().map((k) => `${JSON.stringify(k)}:${stableStr(x[k])}`).join(',')}}`;
+  return JSON.stringify(x === undefined ? null : x);
+}
+const sameVal = (a, b) => stableStr(a) === stableStr(b);
+const isPlain = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+const isIdList = (x) => Array.isArray(x) && x.every((v) => isPlain(v) && typeof v.id === 'string');
+
+/* before → after 사이에 바뀐 곳: 객체는 키마다(3단계까지), id가 있는 목록(할 일·일정)은 id마다 */
+function diffState(a, b, path = [], out = []) {
+  if (sameVal(a, b)) return out;
+  const listA = isIdList(a) || (a === undefined && isIdList(b));
+  const listB = isIdList(b) || (b === undefined && isIdList(a));
+  if (path.length < 3 && listA && listB) {
+    const A = a || [], B = b || [];
+    for (const id of new Set([...A.map((v) => v.id), ...B.map((v) => v.id)])) {
+      const x = A.find((v) => v.id === id), y = B.find((v) => v.id === id);
+      if (!sameVal(x, y)) out.push({ path, id, before: x, after: y, at: A.indexOf(x) });
+    }
+  } else if (path.length < 3 && (isPlain(a) || a === undefined) && (isPlain(b) || b === undefined)) {
+    for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) diffState((a || {})[k], (b || {})[k], [...path, k], out);
+  } else out.push({ path, before: a, after: b });
+  return out;
+}
+
+/* 바뀐 곳이 지금도 '바뀐 그대로'일 때만 원래대로 (그 사이 또 바뀐 곳은 건드리지 않음) */
+function revertChanges(before, after) {
+  let n = 0;
+  for (const c of diffState(before, after).reverse()) {
+    let box = state;
+    for (const k of c.path.slice(0, -1)) {
+      if (!isPlain(box[k])) box[k] = {};
+      box = box[k];
+    }
+    const last = c.path[c.path.length - 1];
+    if (c.id !== undefined) {
+      if (!Array.isArray(box[last])) box[last] = [];
+      const list = box[last];
+      const i = list.findIndex((v) => v.id === c.id);
+      if (!sameVal(i < 0 ? undefined : list[i], c.after)) continue;
+      if (c.before === undefined) list.splice(i, 1);
+      else if (i < 0) list.splice(Math.min(c.at, list.length), 0, c.before);
+      else list[i] = c.before;
+    } else {
+      if (!sameVal(box[last], c.after)) continue;
+      if (c.before === undefined) delete box[last];
+      else box[last] = c.before;
+    }
+    n++;
+  }
+  return n > 0;
 }
 
 /* ───────── 날짜 ───────── */
@@ -103,7 +163,10 @@ function relDay(k) {
 }
 const dday = (k) => { const n = diffDays(k, today); return n === 0 ? 'D-day' : n > 0 ? `D-${n}` : `D+${-n}`; };
 
-let today = keyOf(new Date());
+/* 하루는 새벽 4시에 바뀐다: 자정을 넘겨 공부하거나 체크해도 그날 기록으로 남게 */
+const DAY_START_HOUR = 4;
+const todayKey = () => keyOf(new Date(Date.now() - DAY_START_HOUR * 36e5));
+let today = todayKey();
 
 /* ───────── 화면 상태 ───────── */
 const ui = {

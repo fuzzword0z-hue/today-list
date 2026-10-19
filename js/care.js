@@ -22,13 +22,13 @@ const ml = (k) => `${parse(k).getMonth() + 1}/${parse(k).getDate()}`;
 const agoText = (n) => (n < 7 ? `${n}일 전` : `${Math.floor(n / 7)}주${n % 7 ? ` ${n % 7}일` : ''} 전`);
 
 /* 한 줄 요약: 이상 있는 항목 + 체중 */
-function condSummary(c) {
+function condSummary(c, withTh = true) {
   if (!c) return '';
   const bad = COND.filter((x) => c[x.f] && isBad(x.f, c[x.f])).map((x) => `${x.label} ${optLabel(x.f, c[x.f])}`);
   const recorded = COND.some((x) => c[x.f]);
   const parts = bad.length ? bad : recorded ? ['특이 사항 없음'] : [];
   if (c.w) parts.push(fmtKg(c.w));
-  if (c.th) parts.push('양치 ✓');
+  if (c.th && withTh) parts.push('양치 ✓');
   if (!parts.length && c.n) parts.push('메모');
   return parts.join(' · ');
 }
@@ -95,10 +95,18 @@ function missingCare() {
   return out;
 }
 
+let carePromptsOpen = false; // 빠진 체크가 여러 개일 때 펼쳐 봤는지
+
 function renderCarePrompts() {
   const el = $('care-prompts');
   const list = ui.date === today ? missingCare() : [];
-  el.innerHTML = list.map(({ ev, k }) => {
+  if (list.length < 2) carePromptsOpen = false;
+  // 여러 개면 한 줄로 묶어서, 눌러야 하나씩 보여 준다 (할 일이 화면 밖으로 밀리지 않게)
+  const head = list.length >= 2 ? `<button class="banner care-group" id="care-group" aria-expanded="${carePromptsOpen}">
+      <span class="banner-text"><b>케어 체크가 빠진 날 ${list.length}개</b> ${carePromptsOpen ? '' : esc([...new Set(list.map(({ ev }) => ev.title))].join(' · '))}</span>
+      <span class="banner-act">${carePromptsOpen ? '접기' : '확인하기'}</span>
+    </button>` : '';
+  el.innerHTML = head + (list.length >= 2 && !carePromptsOpen ? [] : list).map(({ ev, k }) => {
     const K = CARE_KINDS[careKind(ev)];
     const q = careKind(ev) === 'vet' ? `${esc(ev.title)} 다녀왔나요?` : `${esc(ev.title)} 체크가 없어요`;
     return `<div class="banner care-prompt" data-eid="${ev.id}" data-k="${k}">
@@ -110,6 +118,11 @@ function renderCarePrompts() {
 }
 
 $('care-prompts').addEventListener('click', (e) => {
+  if (e.target.closest('#care-group')) {
+    carePromptsOpen = !carePromptsOpen;
+    renderCarePrompts();
+    return;
+  }
   const b = e.target.closest('[data-rec]');
   const box = b && b.closest('.care-prompt');
   const ev = box && state.events.find((x) => x.id === box.dataset.eid);
@@ -131,17 +144,19 @@ function renderCond() {
   el.hidden = !show;
   if (!show) return;
   const open = condOpenFor === k;
-  const sum = condSummary(c);
+  const sum = condSummary(c, false); // 양치는 머리 오른쪽 버튼에 보이므로 뺀다
   el.innerHTML = `
-    <button class="cond-head" aria-expanded="${open}">
-      <span class="cond-ic">${PAW_SVG}</span>
-      <span class="cond-title">고양이 컨디션</span>
-      <span class="cond-sum${hasSymptom(c) ? ' bad' : ''}">${sum ? esc(sum) : '기록하기'}</span>
-      <svg class="cond-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-    <button class="rt-item cond-th${c && c.th ? ' on' : ''}" id="cond-th" aria-pressed="${!!(c && c.th)}">
-      <span class="check">${CHECK_SVG}</span><span class="rt-text"><span class="rt-label">치아 이 닦이기</span></span>
-    </button>
+    <div class="cond-top">
+      <button class="cond-head" aria-expanded="${open}">
+        <span class="cond-ic">${PAW_SVG}</span>
+        <span class="cond-title">고양이 컨디션</span>
+        <span class="cond-sum${hasSymptom(c) ? ' bad' : ''}">${sum ? esc(sum) : '기록하기'}</span>
+        <svg class="cond-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="cond-th${c && c.th ? ' on' : ''}" id="cond-th" aria-pressed="${!!(c && c.th)}" aria-label="치아 이 닦이기">
+        <span class="check">${CHECK_SVG}</span><span>양치</span>
+      </button>
+    </div>
     ${open ? `<div class="cond-body">
       ${COND.map((x) => `<div class="cond-row"><span class="cond-label">${x.label}</span><div class="chips" data-f="${x.f}">
         ${x.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${!!c && c[x.f] === v}" class="${x.bad.includes(v) ? 'bad' : ''}">${l}</button>`).join('')}
@@ -210,7 +225,7 @@ function updateCondHead() {
   const c = condOf(ui.date);
   const s = $('cond').querySelector('.cond-sum');
   if (!s) return;
-  const sum = condSummary(c);
+  const sum = condSummary(c, false);
   s.textContent = sum || '기록하기';
   s.classList.toggle('bad', hasSymptom(c));
 }

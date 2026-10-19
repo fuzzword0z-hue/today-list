@@ -17,6 +17,7 @@
  *   workout, workouts                 운동 체크 상태와 '오늘 운동 완료' 기록 (js/workout.js)
  *   study, studies                    공부 탭에 적어 둔 내용과 '오늘 공부 완료' 기록 (js/study.js)
  *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   요일과 다르게 고른 날 (쉬는 평일 등)
+ *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 먹임·안 감)이 더 붙는다.
  * }
  */
@@ -53,6 +54,10 @@ function normalize(s) {
     delete s.study.b;
   }
   s.daymode = obj(s.daymode) ? s.daymode : {};
+  s.health = obj(s.health) ? s.health : {};
+  s.hgoal = obj(s.hgoal) ? s.hgoal : {};
+  s.weights = obj(s.weights) ? s.weights : {};
+  s.labs = obj(s.labs) ? s.labs : {};
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }

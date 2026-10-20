@@ -403,6 +403,8 @@ function cheer(m, s, W, prev) {
   const extra = [m.st.min ? `공부 ${fmtMin(m.st.min)}` : '', m.wo.days ? `운동 ${m.wo.days}일` : ''].filter(Boolean);
   if (extra.length) out.push(`${W.this} ${extra.join('과 ')}도 챙겼어요. 내 몸과 목표를 함께 돌보고 있어요.`);
   if (prev && prev.rate !== null && m.rate !== null && m.rate > prev.rate + 0.03) out.push(`무엇보다 ${W.prev}보다 나아졌다는 게 가장 큰 성과예요.`);
+  // 아픈 고양이를 지켜보느라 늦게 잔 밤: 탓하지 않고 다독인다
+  if (m.hl && m.hl.cat.nights) out.push(`고양이가 오심·구토로 힘들어해서 밤에 지켜본 날이 ${m.hl.cat.nights}번 있었어요. 어쩔 수 없는 밤이니 다음 날 아침 루틴은 가볍게 잡아도 괜찮아요.`);
   out.push(t >= 70 ? `이 흐름 그대로 ${W.next}도 함께 가요.` : `완벽하지 않아도 괜찮아요. ${W.next}엔 하루 한 가지만 확실히 끝내는 것부터 다시 시작해요.`);
   return out.join(' ');
 }

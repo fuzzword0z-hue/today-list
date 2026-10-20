@@ -7,7 +7,7 @@
  * 새 버전은 설치 단계에서 서버에서 직접(HTTP 캐시 무시) 전부 받아 둔다.
  * 열려 있는 앱을 여기서 강제로 새로 고치지 않는다 (입력 중인 내용이 날아가므로) —
  * 앱이 화면에서 내려갔을 때 앱 쪽(main.js)에서 새로 고친다. */
-const VERSION = '18';
+const VERSION = '19';
 const CACHE = `today-v${VERSION}`;
 const ASSETS = [
   './',

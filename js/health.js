@@ -8,6 +8,8 @@
  *   snack = 과자 먹은 날, food = 주의 음식(빵·라면·김밥·튀김) 먹은 날, veg = 야채 먼저 안 먹은 날,
  *   late = 그날 밤 11:30 넘어서 잔 날 (다음 날 아침 '어젯밤'으로, 밤 10시 넘어서는 '오늘 밤'으로 체크하고, 잔 날 밤의 날짜로 남긴다)
  *   lateWhy = 늦게 잔 이유 (여러 개: 일 · 집안일 · 고양이 케어 · 핸드폰 · 잠이 안 옴)
+ *   lateCat = 고양이 케어로 늦게 잔 까닭 (여러 개: nausea 오심이 심해 토할까 봐 지켜봄 · vomit 구토 후 멈췄는지 확인)
+ *   '고양이 케어'로 늦게 잔 밤은 습관이 아니라 아픈 고양이를 지켜본 밤이라 '늦게 잠' 주 목표에서 빼고 따로 센다.
  * state.hgoal   = { snack, veg, late, food }   주 목표 (주 n회 이하), 주의 음식은 n일에 한 번
  * state.hstart  = 처음 카드를 본 날 (리포트는 이 날부터 센다 — 체크가 없는 날도 '지킨 날'이라서)
  * state.weights = { 'YYYY-MM-DD': kg }   내 체중 (체중계가 있는 본가에서, 한 달에 한 번쯤)
@@ -25,6 +27,10 @@ const H_ITEMS = [
     opts: [['work', '일'], ['chores', '집안일'], ['cat', '고양이 케어'], ['phone', '핸드폰'], ['awake', '잠이 안 옴']] },
 ];
 const H_WEEKLY = ['snack', 'veg', 'late']; // 주 n회 이하가 목표인 항목
+const CAT_WATCH = [['nausea', '오심 지켜봄'], ['vomit', '구토 후 확인']];
+const lateWhyOf = (h) => (!h ? [] : Array.isArray(h.lateWhy) ? h.lateWhy : h.lateWhy ? [h.lateWhy] : []);
+/* 고양이를 지켜보느라 늦게 잔 밤 (오심·구토) */
+const catNight = (d) => hOn('late', d) && lateWhyOf(state.health[d]).includes('cat');
 const H_GOAL = { snack: 2, veg: 2, late: 2, food: 14 };
 const LABS = [
   { f: 'a1c', label: '당화혈색소', unit: '%', step: '0.1' },
@@ -62,10 +68,14 @@ function setHealth(d, patch) {
 }
 
 /* k가 들어 있는 주(일–토)의 예외 횟수 */
+/* k가 들어 있는 주(일–토)의 예외 횟수. 고양이를 지켜본 밤은 late가 아니라 cat으로 따로 센다 */
 function hWeekCount(k) {
   const ws = weekStart(k);
-  const c = { snack: 0, veg: 0, late: 0 };
-  for (let i = 0; i < 7; i++) for (const id of H_WEEKLY) if (hOn(id, addDays(ws, i))) c[id]++;
+  const c = { snack: 0, veg: 0, late: 0, cat: 0 };
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i);
+    for (const id of H_WEEKLY) if (hOn(id, d)) c[id === 'late' && catNight(d) ? 'cat' : id]++;
+  }
   return c;
 }
 
@@ -139,8 +149,21 @@ function renderHealth() {
   }).map((it) => {
     const h = state.health[hDay(it, k)];
     const cur = it.multi ? h[it.why] || [] : [h[it.why]];
-    return `<div class="cond-row h-why"><span class="cond-label">${it.main}</span>
+    let row = `<div class="cond-row h-why"><span class="cond-label">${it.main}</span>
       <div class="chips" data-why="${it.id}">${it.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${cur.includes(v)}">${l}</button>`).join('')}</div></div>`;
+    // 고양이 케어로 늦게 잔 밤: 오심을 지켜봤는지, 구토 후 확인했는지
+    if (it.id === 'late' && cur.includes('cat')) {
+      const d = hDay(it, k);
+      const cw = h.lateCat || [];
+      row += `<div class="cond-row h-why"><span class="cond-label">고양이</span>
+        <div class="chips" data-why="lateCat">${CAT_WATCH.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${cw.includes(v)}">${l}</button>`).join('')}</div></div>`;
+      // 구토를 확인한 밤인데 고양이 컨디션에 구토 기록이 없으면 알려 준다
+      const c = condOf(d);
+      if (cw.includes('vomit') && !(c && c.vo && c.vo !== '0')) {
+        row += `<p class="h-nudge">${ml(d)} 고양이 컨디션에 구토 기록이 없어요 <button type="button" data-vo="${d}">구토 1회로 기록</button></p>`;
+      }
+    }
+    return row;
   }).join('');
 
   el.innerHTML = `
@@ -156,6 +179,7 @@ function renderHealth() {
       return `<button class="h-tg" data-h="${it.id}" aria-pressed="${pressed}" aria-label="${label}"><b>${it.main}</b><small>${sub(it)}</small></button>`;
     }).join('')}</div>
     ${whyRows ? `<div class="h-whys">${whyRows}</div>` : ''}
+    ${cnt.cat ? `<p class="h-catweek">${thisWeek ? '이번 주' : '그 주'} 고양이를 지켜본 밤 ${cnt.cat}번 · 늦게 잠 목표에서 뺐어요</p>` : ''}
     ${open ? healthBody(k, lf, gap) : ''}`;
 }
 
@@ -215,11 +239,29 @@ $('health').addEventListener('click', (e) => {
   if (tg) {
     const it = hItem(tg.dataset.h);
     const d = hDay(it, k);
-    if (hOn(it.id, d)) setHealth(d, { [it.id]: null, ...(it.why ? { [it.why]: null } : {}) });
+    if (hOn(it.id, d)) setHealth(d, { [it.id]: null, ...(it.why ? { [it.why]: null } : {}), ...(it.id === 'late' ? { lateCat: null } : {}) });
     else {
       setHealth(d, { [it.id]: 1 });
       if (navigator.vibrate) navigator.vibrate(8);
     }
+    renderHealth();
+    return;
+  }
+  const vo = e.target.closest('[data-vo]');
+  if (vo) {
+    const d = vo.dataset.vo;
+    undoable(`${ml(d)} 고양이 구토 1회로 기록했어요`, () => {
+      state.cond[d] = { ...(state.cond[d] || {}), vo: '1' };
+    });
+    return;
+  }
+  const cw = e.target.closest('[data-why="lateCat"] [data-v]');
+  if (cw) {
+    const d = hDay(hItem('late'), k);
+    const cur = (state.health[d] || {}).lateCat || [];
+    const v = cw.dataset.v;
+    const nx = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+    setHealth(d, { lateCat: nx.length ? nx : null });
     renderHealth();
     return;
   }
@@ -232,7 +274,8 @@ $('health').addEventListener('click', (e) => {
     if (it.multi) {
       const cur = h[it.why] || [];
       const nx = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
-      setHealth(d, { [it.why]: nx.length ? nx : null });
+      // 고양이 케어를 빼면 그 밑의 오심·구토도 지운다
+      setHealth(d, { [it.why]: nx.length ? nx : null, ...(it.id === 'late' && !nx.includes('cat') ? { lateCat: null } : {}) });
     } else setHealth(d, { [it.why]: h[it.why] === v ? null : v });
     renderHealth();
     return;
@@ -344,7 +387,6 @@ const SNACK_TIP = {
 const LATE_TIP = {
   work: '일이 늦게 끝나는 날이 많아요. 그런 날은 씻고 바로 누울 수 있게 잘 준비를 미리 해 두세요.',
   chores: '집안일이 밤으로 밀리는 날이 많아요. 저녁 먹고 15분만 먼저 해 두고, 내일로 넘겨도 되는 일은 넘겨 보세요.',
-  cat: '고양이 케어로 늦어지는 날이 많아요. 투약·수액 시간을 조금 앞당기거나 준비물을 미리 꺼내 두면 잠자리에 일찍 들 수 있어요.',
   phone: '11시가 되면 핸드폰을 침대에서 먼 곳에 충전해 두세요.',
   awake: '잠이 안 오는 날이 많아요. 커피는 오후 2시 전까지만, 자기 전 30분은 화면을 멀리해 보세요.',
 };
@@ -354,6 +396,7 @@ function analyzeHealth(start, last, end) {
   const goal = hGoal();
   const hl = {
     on: false, span: 0, snack: 0, veg: 0, late: 0, food: 0,
+    cat: { nights: 0, nausea: 0, vomit: 0, dates: [] }, // 고양이를 지켜본 밤 (late에는 넣지 않음)
     why: { snack: {}, late: {}, foods: {} }, weeks: [], ok: { snack: 0, veg: 0, late: 0, food: 0 },
     lateSnack: 0, foodGaps: [], foodEarly: [],
     weights: Object.keys(state.weights).filter((d) => d >= start && d <= end).sort(),
@@ -374,9 +417,14 @@ function analyzeHealth(start, last, end) {
     if (!h) continue;
     if (h.snack) { hl.snack++; bump(hl.why.snack, h.snackWhy || 'none'); }
     if (h.veg) hl.veg++;
-    if (h.late) {
+    if (h.late && catNight(d)) {
+      // 아픈 고양이를 지켜본 밤: 습관이 아니므로 늦게 잔 날·주 목표·'늦게 잔 다음 날 과자'에 넣지 않는다
+      hl.cat.nights++;
+      hl.cat.dates.push(d);
+      for (const w of h.lateCat || []) if (hl.cat[w] !== undefined) hl.cat[w]++;
+    } else if (h.late) {
       hl.late++;
-      const why = Array.isArray(h.lateWhy) ? h.lateWhy : h.lateWhy ? [h.lateWhy] : [];
+      const why = lateWhyOf(h);
       if (why.length) for (const w of why) bump(hl.why.late, w); else bump(hl.why.late, 'none');
       if (addDays(d, 1) <= last && hOn('snack', addDays(d, 1))) hl.lateSnack++;
     }
@@ -414,6 +462,8 @@ function iGa(w) {
   if (c >= 0xac00 && c <= 0xd7a3) return (c - 0xac00) % 28 ? '이' : '가';
   return /[lmnr0136780]$/i.test(w) ? '이' : '가';
 }
+/* 고양이 지켜본 밤 요약: '오심 2 · 구토 1' */
+const catWatchText = (c) => [c.nausea ? `오심 ${c.nausea}` : '', c.vomit ? `구토 ${c.vomit}` : ''].filter(Boolean).join(' · ') || '오심·구토';
 const hTop = (o) => Object.entries(o).filter(([k]) => k !== 'none').sort((a, b) => b[1] - a[1])[0] || null;
 const hDist = (it, o) => Object.entries(o).sort((a, b) => b[1] - a[1])
   .map(([k, n]) => `${k === 'none' ? '안 고름' : optLabelOf(it, k)} ${n}`).join(' · ');
@@ -470,6 +520,7 @@ function healthSection(hl, yearly) {
     tiles.push(['과자 먹은 날', `${hl.snack}<small>/${hl.span}일</small>`, wk('snack')]);
     tiles.push(['야채 순서 놓친 날', `${hl.veg}<small>/${hl.span}일</small>`, wk('veg')]);
     tiles.push(['늦게 잔 날', `${hl.late}<small>/${hl.span}일</small>`, wk('late')]);
+    if (hl.cat.nights) tiles.push(['고양이 지켜본 밤', `${hl.cat.nights}<small>일</small>`, `<small>${catWatchText(hl.cat)}</small>`]);
     tiles.push(['주의 음식', `${hl.food}<small>번</small>`, hl.foodEarly.length ? `<small>${g.food}일 안에 다시 ${hl.foodEarly.length}번</small>`
       : hl.foodGaps.length ? `<small>가장 짧은 간격 ${Math.min(...hl.foodGaps)}일</small>` : '']);
   }
@@ -484,6 +535,7 @@ function healthSection(hl, yearly) {
   if (hl.on) {
     if (hl.snack) dists.push(['과자 이유', hDist(hItem('snack'), hl.why.snack)]);
     if (hl.late) dists.push(['늦게 잔 이유', hDist(hItem('late'), hl.why.late)]);
+    if (hl.cat.nights) dists.push(['고양이 지켜본 밤', `${catWatchText(hl.cat)} — ${hl.cat.dates.map(ml).join(', ')} (늦게 잠 목표에서 뺐어요)`]);
     if (Object.keys(hl.why.foods).length) dists.push(['주의 음식', hDist(hItem('food'), hl.why.foods)]);
   }
   const lines = [

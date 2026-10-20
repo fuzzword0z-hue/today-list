@@ -272,7 +272,10 @@ function careSummaryData() {
   const weights = recs.filter(([, r]) => r.w).map(([k, r]) => ({ k, w: r.w }));
   const notes = recs.filter(([, r]) => r.n).map(([k, r]) => ({ k, n: r.n }));
   const teeth = recs.filter(([, r]) => r.th).length;
-  return { last, next, from, to, days, doses, recs, ap: count('ap'), en: count('en'), st: count('st'), vomit, weights, notes, teeth };
+  // 밤에 지켜본 날: 오심이 심해 토할까 봐, 구토 후 멈췄는지 보느라 늦게 잔 밤 (내 건강 카드의 '늦게 잠 · 고양이 케어')
+  const watch = [];
+  for (let k = from; k <= to; k = addDays(k, 1)) if (catNight(k)) watch.push({ k, why: state.health[k].lateCat || [] });
+  return { last, next, from, to, days, doses, recs, ap: count('ap'), en: count('en'), st: count('st'), vomit, weights, notes, teeth, watch };
 }
 
 function renderCareSummary() {
@@ -322,6 +325,11 @@ function renderCareSummary() {
       ? `체중: ${fmtKg(a.w)} (${ml(a.k)}) → ${fmtKg(b.w)} (${ml(b.k)}) · ${d > 0 ? '+' : ''}${d}kg (${pctv > 0 ? '+' : ''}${pctv}%)`
       : `체중: ${fmtKg(a.w)} (${ml(a.k)})`);
     if (s.weights.length > 2) cond.push(`체중 기록: ${s.weights.map((x) => `${ml(x.k)} ${x.w}`).join(' · ')}`);
+  }
+  if (s.watch.length) {
+    const n = (w) => s.watch.filter((x) => x.why.includes(w)).length;
+    const parts = [n('nausea') ? `오심 ${n('nausea')}일` : '', n('vomit') ? `구토 ${n('vomit')}일` : ''].filter(Boolean).join(' · ');
+    cond.push(`밤에 지켜본 날: ${s.watch.length}일${parts ? ` (${parts})` : ''} — ${s.watch.map((x) => `${ml(x.k)}${x.why.length ? ` ${x.why.map((w) => (w === 'nausea' ? '오심' : '구토')).join('·')}` : ''}`).join(', ')}`);
   }
   if (cond.length) sec.push(['컨디션', cond]);
   if (s.notes.length) sec.push(['메모', s.notes.map((x) => `${ml(x.k)} ${x.n}`)]);

@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
   <title>오늘</title>
 </head>
 <body>
@@ -134,6 +134,7 @@
           <h2 class="sub-head">백업</h2>
           <p class="backup-text">기록은 이 휴대폰 안에만 있어요. 가끔 파일로 내보내 두면, 휴대폰을 바꾸거나 사이트 데이터를 지워도 그 파일로 되살릴 수 있어요.</p>
           <p class="backup-last" id="backup-last"></p>
+          <p class="backup-size" id="backup-size"></p>
           <div class="backup-actions">
             <button class="backup-btn primary" id="export-btn">내보내기</button>
             <button class="backup-btn" id="import-btn">불러오기</button>
@@ -215,6 +216,34 @@
       </div>
     </section>
 
+    <!-- ───────── 감사일기 ───────── -->
+    <section class="view" id="view-diary" hidden>
+      <header class="top">
+        <div class="top-row">
+          <span class="date-sub" id="dy-sub"></span>
+          <button class="pill" id="dy-today" hidden>오늘로</button>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="dy-prev" aria-label="이전 날">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button class="icon-btn" id="dy-next" aria-label="다음 날">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="top-row"><h1 class="date-main">감사일기</h1></div>
+      </header>
+      <main class="scroll" id="dy-scroll">
+        <section class="wo-card dy-card">
+          <div class="wo-head"><span class="wo-name">감사한 일</span><span class="wo-target">한 줄에 하나씩, 작은 것도 좋아요</span>
+            <span class="wo-amt dy-count" id="dy-count"></span></div>
+          <textarea class="dy-text" id="dy-text" rows="6" maxlength="2000" aria-label="감사일기"></textarea>
+          <p class="dy-status" id="dy-status"></p>
+        </section>
+        <section class="wo-card dy-month" id="dy-month"></section>
+        <p class="wo-note">일기는 이 휴대폰에만 저장되고, 통계 탭의 백업 파일(내보내기)에 함께 담겨요.<br>한 달 쓴 뒤 '이번 달 일기 복사'로 채팅에 붙여 넣으면 피드백을 받을 수 있어요.</p>
+      </main>
+    </section>
+
     <!-- ───────── 하단 탭 ───────── -->
     <nav class="tabs" id="tabs" aria-label="화면">
       <button data-tab="today">
@@ -232,6 +261,10 @@
       <button data-tab="study">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23"/><path d="M4 20.5V5.5M8 7h8M8 10.5h6"/></svg>
         <span>공부</span>
+      </button>
+      <button data-tab="diary">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h11.5A2.5 2.5 0 0 1 19 7v12.5H7.5A2.5 2.5 0 0 1 5 17z"/><path d="M12 15.2s-3-1.9-3-4a1.6 1.6 0 0 1 3-.9 1.6 1.6 0 0 1 3 .9c0 2.1-3 4-3 4z"/></svg>
+        <span>일기</span>
       </button>
       <button data-tab="stats">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
@@ -330,17 +363,18 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=19"></script>
-  <script src="js/events.js?v=19"></script>
-  <script src="js/today.js?v=19"></script>
-  <script src="js/calendar.js?v=19"></script>
-  <script src="js/stats.js?v=19"></script>
-  <script src="js/report.js?v=19"></script>
-  <script src="js/care.js?v=19"></script>
-  <script src="js/workout.js?v=19"></script>
-  <script src="js/study.js?v=19"></script>
-  <script src="js/health.js?v=19"></script>
-  <script src="js/backup.js?v=19"></script>
-  <script src="js/main.js?v=19"></script>
+  <script src="js/core.js?v=20"></script>
+  <script src="js/events.js?v=20"></script>
+  <script src="js/today.js?v=20"></script>
+  <script src="js/calendar.js?v=20"></script>
+  <script src="js/stats.js?v=20"></script>
+  <script src="js/report.js?v=20"></script>
+  <script src="js/care.js?v=20"></script>
+  <script src="js/workout.js?v=20"></script>
+  <script src="js/study.js?v=20"></script>
+  <script src="js/health.js?v=20"></script>
+  <script src="js/diary.js?v=20"></script>
+  <script src="js/backup.js?v=20"></script>
+  <script src="js/main.js?v=20"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ function refreshToday() {
   if (now === today) return;
   if (ui.date === today) ui.date = now;
   if (ui.calSel === today) { ui.calSel = now; ui.calMonth = monthStart(now); }
+  if (ui.diaryDate === today) ui.diaryDate = now;
   today = now;
   render();
 }

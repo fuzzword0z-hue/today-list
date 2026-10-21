@@ -19,6 +19,7 @@
  *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   출근일 · 쉬는 날을 기본(매주 쉬는 요일)과 다르게 고른 날
  *   offDays: [요일]   매주 쉬는 요일 (0 = 일요일, 처음엔 [1] 월요일)
  *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
+ *   diary: { 'YYYY-MM-DD': { t, at } }   감사일기 (js/diary.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
  */
@@ -62,6 +63,7 @@ function normalize(s) {
   s.hgoal = obj(s.hgoal) ? s.hgoal : {};
   s.weights = obj(s.weights) ? s.weights : {};
   s.labs = obj(s.labs) ? s.labs : {};
+  s.diary = obj(s.diary) ? s.diary : {};
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }
@@ -206,6 +208,7 @@ const ui = {
   editing: null,        // 수정 중인 할 일 id
   calMonth: monthStart(today), // 캘린더에서 보고 있는 달
   calSel: today,        // 캘린더에서 선택한 날
+  diaryDate: today,     // 감사일기에서 보고 있는 날
 };
 
 const $ = (id) => document.getElementById(id);
@@ -217,7 +220,7 @@ const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l
 /* ───────── 화면 전환 ─────────
  * 탭(오늘·캘린더·통계)은 기록을 남기지 않고 바꾸고(replace),
  * 리포트처럼 '들어가는' 화면만 기록을 남겨(push) 안드로이드 뒤로 가기로 돌아올 수 있게 한다. */
-const VIEWS = ['today', 'cal', 'workout', 'study', 'stats', 'report'];
+const VIEWS = ['today', 'cal', 'workout', 'study', 'diary', 'stats', 'report'];
 
 function route() {
   const h = location.hash.slice(1);
@@ -264,6 +267,7 @@ function renderView() {
   else if (r.view === 'cal') renderCal();
   else if (r.view === 'workout') renderWorkout();
   else if (r.view === 'study') renderStudy();
+  else if (r.view === 'diary') renderDiary();
   else if (r.view === 'stats') renderStats();
   else renderReport(r.id);
 }

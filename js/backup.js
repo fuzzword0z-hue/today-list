@@ -11,7 +11,20 @@ function beforeImport() {
   try { const j = JSON.parse(localStorage.getItem(BEFORE_IMPORT)); return j && j.data ? j : null; } catch (e) { return null; }
 }
 
+/* 저장 공간: 크롬은 사이트마다 약 524만 자(5MB)까지 저장한다 (한글·영어 모두 한 글자씩) */
+const STORE_QUOTA = 5242880;
+function storageUsed() {
+  let n = 0;
+  try { for (const k of [STORE, BEFORE_IMPORT]) n += (localStorage.getItem(k) || '').length + k.length; } catch (e) { /* 무시 */ }
+  return n;
+}
+
 function renderBackup() {
+  const used = storageUsed();
+  const ratio = used / STORE_QUOTA;
+  const size = used < 102400 ? `${Math.max(1, Math.round(used / 1024))}KB` : `${(used / 1048576).toFixed(2)}MB`;
+  $('backup-size').textContent = `저장 공간: 약 ${size} 사용 · 휴대폰 저장 한도(약 5MB)의 ${ratio < 0.01 ? '1% 미만' : `${Math.round(ratio * 100)}%`}${ratio >= 0.6 ? ' — 곧 가득 차요. 내보내기를 해 두세요' : ''}`;
+  $('backup-size').classList.toggle('warn', ratio >= 0.6);
   const bi = beforeImport();
   $('import-undo').hidden = !bi;
   if (bi) $('import-undo').textContent = `${md(keyOf(new Date(bi.at)))} 불러오기 전 기록으로 되돌리기`;

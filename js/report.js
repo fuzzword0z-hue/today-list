@@ -29,7 +29,7 @@ function hasData({ start, end }) {
   for (const k in state.cond) if (k >= start && k <= end) return true;
   for (const k in state.workouts) if (k >= start && k <= end) return true;
   for (const k in state.studies) if (k >= start && k <= end) return true;
-  for (const o of [state.health, state.weights, state.labs]) for (const k in o) if (k >= start && k <= end) return true;
+  for (const o of [state.health, state.weights, state.labs, state.diary]) for (const k in o) if (k >= start && k <= end) return true;
   const inRange = (o) => o && Object.keys(o).some((k) => k >= start && k <= end);
   return state.events.some((ev) => inRange(ev.done) || inRange(ev.skip));
 }
@@ -217,6 +217,9 @@ function analyze(id) {
   }
   m.st = st;
   m.hl = analyzeHealth(start, last, end);
+  // 감사일기: 쓴 날 · 줄 수 (내용은 리포트에 넣지 않는다 — 피드백은 채팅에서)
+  m.dy = { days: 0, lines: 0 };
+  for (const k in state.diary) if (k >= start && k <= last) { m.dy.days++; m.dy.lines += diaryLines(state.diary[k].t); }
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
@@ -403,6 +406,7 @@ function cheer(m, s, W, prev) {
   const extra = [m.st.min ? `공부 ${fmtMin(m.st.min)}` : '', m.wo.days ? `운동 ${m.wo.days}일` : ''].filter(Boolean);
   if (extra.length) out.push(`${W.this} ${extra.join('과 ')}도 챙겼어요. 내 몸과 목표를 함께 돌보고 있어요.`);
   if (prev && prev.rate !== null && m.rate !== null && m.rate > prev.rate + 0.03) out.push(`무엇보다 ${W.prev}보다 나아졌다는 게 가장 큰 성과예요.`);
+  if (m.dy.days >= 3) out.push(`감사일기를 ${m.dy.days}일 썼어요. 작은 감사를 알아보는 눈이 자라고 있어요.`);
   // 아픈 고양이를 지켜보느라 늦게 잔 밤: 탓하지 않고 다독인다
   if (m.hl && m.hl.cat.nights) out.push(`고양이가 오심·구토로 힘들어해서 밤에 지켜본 날이 ${m.hl.cat.nights}번 있었어요. 어쩔 수 없는 밤이니 다음 날 아침 루틴은 가볍게 잡아도 괜찮아요.`);
   out.push(t >= 70 ? `이 흐름 그대로 ${W.next}도 함께 가요.` : `완벽하지 않아도 괜찮아요. ${W.next}엔 하루 한 가지만 확실히 끝내는 것부터 다시 시작해요.`);
@@ -421,7 +425,7 @@ function renderReport(id) {
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
   const [hlSec, hlLines] = healthSection(m.hl, m.yearly);
-  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec)) {
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec && !m.dy.days)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -457,6 +461,7 @@ function renderReport(id) {
     const d = Math.round((b - a) * 100) / 100;
     tiles.push(['체중', `${b}<small>kg</small>`, `<small>${d > 0 ? '+' : ''}${d}kg (${a}→${b})</small>`]);
   }
+  if (m.dy.days) tiles.push(['감사일기', `${m.dy.days}<small>/${diffDays(m.last, m.start) + 1}일</small>`, `<small>${m.dy.lines}줄</small>`]);
   const ev = m.evCount;
   if (ev.work + ev.life + ev.care) tiles.push(['일정', `${ev.work + ev.life + ev.care}<small>개</small>`, `<small>공적 ${ev.work} · 사적 ${ev.life}${ev.care ? ` · 케어 ${ev.care}` : ''}</small>`]);
 

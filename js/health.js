@@ -4,8 +4,8 @@
  * 오늘 화면의 카드. 매일 할 일은 '안 지킨 것만 누르기' — 아무것도 안 누른 날은 다 지킨 날이다.
  * 연속 달성(스트릭) 대신 '이번 주 예외 횟수 / 목표'로 보여 준다 (하루 실패해도 한 주는 성공할 수 있게).
  *
- * state.health  = { 'YYYY-MM-DD': { snack, snackWhy, food, foods: [...], veg, late, lateWhy: [...] } }
- *   snack = 과자 먹은 날, food = 주의 음식(빵·라면·김밥·튀김) 먹은 날, veg = 야채 먼저 안 먹은 날,
+ * state.health  = { 'YYYY-MM-DD': { snack, snackWhy, snackNote, food, foods: [...], veg, late, lateWhy: [...] } }
+ *   snack = 과자 먹은 날, snackWhy = 이유 하나, snackNote = 이유가 '기타'일 때 직접 적은 글 (예: 회사에 새 과자가 와서 다 같이 맛봄), food = 주의 음식(빵·라면·김밥·튀김) 먹은 날, veg = 야채 먼저 안 먹은 날,
  *   late = 그날 밤 11:30 넘어서 잔 날 (다음 날 아침 '어젯밤'으로, 밤 10시 넘어서는 '오늘 밤'으로 체크하고, 잔 날 밤의 날짜로 남긴다)
  *   lateWhy = 늦게 잔 이유 (여러 개: 일 · 집안일 · 고양이 케어 · 핸드폰 · 잠이 안 옴)
  *   lateCat = 고양이 케어로 늦게 잔 까닭 (여러 개: nausea 오심이 심해 토할까 봐 지켜봄 · vomit 구토 후 멈췄는지 확인)
@@ -19,7 +19,7 @@
 
 const H_ITEMS = [
   { id: 'snack', label: '과자 먹음', short: '과자', main: '과자', sub: '먹음', why: 'snackWhy', ask: '이유',
-    opts: [['stress', '스트레스'], ['tired', '피곤'], ['bored', '지루함'], ['hungry', '배고픔']] },
+    opts: [['stress', '스트레스'], ['tired', '피곤'], ['bored', '지루함'], ['hungry', '배고픔'], ['etc', '기타']], note: 'snackNote' },
   { id: 'food', label: '주의 음식 먹음', short: '주의 음식', main: '주의 음식', sub: '먹음', why: 'foods', ask: '무엇', multi: true,
     opts: [['bread', '빵'], ['ramen', '라면'], ['gimbap', '김밥'], ['fried', '튀김']] },
   { id: 'veg', label: '야채 먼저 안 먹음', short: '야채', main: '야채 먼저', sub: '안 먹음' },
@@ -145,12 +145,19 @@ function renderHealth() {
   // 이유 고르기: 아직 고르지 않은 것만 (펼치면 전부)
   const whyRows = H_ITEMS.filter((it) => it.opts && hOn(it.id, hDay(it, k))).filter((it) => {
     const v = state.health[hDay(it, k)][it.why];
-    return open || it.multi || !v; // 여러 개 고르는 것(주의 음식 · 늦게 잔 이유)은 누른 동안 계속 보여 준다
+    // 여러 개 고르는 것(주의 음식 · 늦게 잔 이유)은 누른 동안 계속, '기타'는 적은 글이 보이게 계속 보여 준다
+    return open || it.multi || !v || (it.note && v === 'etc');
   }).map((it) => {
     const h = state.health[hDay(it, k)];
     const cur = it.multi ? h[it.why] || [] : [h[it.why]];
     let row = `<div class="cond-row h-why"><span class="cond-label">${it.main}</span>
       <div class="chips" data-why="${it.id}">${it.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${cur.includes(v)}">${l}</button>`).join('')}</div></div>`;
+    // '기타'를 고르면 직접 적는 칸
+    if (it.note && h[it.why] === 'etc') {
+      row += `<div class="cond-row h-why"><span class="cond-label"></span>
+        <textarea class="h-note-in" data-note="${it.id}" rows="1" maxlength="80" enterkeyhint="done" aria-label="${it.main} 기타 이유"
+          placeholder="예: 새 과자를 다 같이 맛봄 (1개)">${esc(h[it.note] || '')}</textarea></div>`;
+    }
     // 고양이 케어로 늦게 잔 밤: 오심을 지켜봤는지, 구토 후 확인했는지
     if (it.id === 'late' && cur.includes('cat')) {
       const d = hDay(it, k);
@@ -181,6 +188,7 @@ function renderHealth() {
     ${whyRows ? `<div class="h-whys">${whyRows}</div>` : ''}
     ${cnt.cat ? `<p class="h-catweek">${thisWeek ? '이번 주' : '그 주'} 고양이를 지켜본 밤 ${cnt.cat}번 · 늦게 잠 목표에서 뺐어요</p>` : ''}
     ${open ? healthBody(k, lf, gap) : ''}`;
+  for (const t of el.querySelectorAll('.h-note-in')) growText(t); // 적은 글이 다 보이게
 }
 
 function healthBody(k, lf, gap) {
@@ -239,7 +247,7 @@ $('health').addEventListener('click', (e) => {
   if (tg) {
     const it = hItem(tg.dataset.h);
     const d = hDay(it, k);
-    if (hOn(it.id, d)) setHealth(d, { [it.id]: null, ...(it.why ? { [it.why]: null } : {}), ...(it.id === 'late' ? { lateCat: null } : {}) });
+    if (hOn(it.id, d)) setHealth(d, { [it.id]: null, ...(it.why ? { [it.why]: null } : {}), ...(it.note ? { [it.note]: null } : {}), ...(it.id === 'late' ? { lateCat: null } : {}) });
     else {
       setHealth(d, { [it.id]: 1 });
       if (navigator.vibrate) navigator.vibrate(8);
@@ -271,13 +279,20 @@ $('health').addEventListener('click', (e) => {
     const d = hDay(it, k);
     const h = state.health[d] || {};
     const v = why.dataset.v;
+    let toNote = false;
     if (it.multi) {
       const cur = h[it.why] || [];
       const nx = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
       // 고양이 케어를 빼면 그 밑의 오심·구토도 지운다
       setHealth(d, { [it.why]: nx.length ? nx : null, ...(it.id === 'late' && !nx.includes('cat') ? { lateCat: null } : {}) });
-    } else setHealth(d, { [it.why]: h[it.why] === v ? null : v });
+    } else {
+      const nv = h[it.why] === v ? null : v;
+      // '기타'가 아닌 이유로 바꾸면 적어 둔 글도 지운다
+      setHealth(d, { [it.why]: nv, ...(it.note && nv !== 'etc' ? { [it.note]: null } : {}) });
+      toNote = !!it.note && nv === 'etc';
+    }
     renderHealth();
+    if (toNote) $('health').querySelector(`[data-note="${it.id}"]`).focus(); // '기타'를 고르면 바로 적을 수 있게
     return;
   }
   const st = e.target.closest('.h-step [data-d]');
@@ -294,6 +309,23 @@ $('health').addEventListener('click', (e) => {
   if (e.target.closest('#h-lab-add')) { openLabSheet(state.labs[k] ? k : null); return; }
   const ld = e.target.closest('[data-lab]');
   if (ld) openLabSheet(ld.dataset.lab);
+});
+
+/* '기타' 이유 적기: 다시 그리지 않고 저장만 (입력 중인 칸이 흔들리지 않게). 한 줄로 적고, 길면 칸이 늘어난다 */
+$('health').addEventListener('input', (e) => {
+  const inp = e.target.closest('[data-note]');
+  if (!inp) return;
+  const it = hItem(inp.dataset.note);
+  const h = state.health[hDay(it, ui.date)];
+  if (!h) return;
+  growText(inp);
+  const t = inp.value.replace(/\s*\n\s*/g, ' ').trim();
+  if (t) h[it.note] = t;
+  else delete h[it.note];
+  saveSoon();
+});
+$('health').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.closest('[data-note]')) { e.preventDefault(); e.target.blur(); }
 });
 
 $('health').addEventListener('change', (e) => {
@@ -383,6 +415,7 @@ const SNACK_TIP = {
   tired: '피곤할 때 단 게 당겨요. 늦게 잔 다음 날과 겹치는지 보고, 잠부터 챙겨 보세요.',
   bored: '심심할 때 손이 가요. 과자는 눈에 안 보이는 곳에 두고, 쉬는 시간엔 물 한 잔부터 마셔 보세요.',
   hungry: '끼니 사이가 길어서 배가 고파요. 견과류나 삶은 달걀처럼 든든한 간식을 미리 챙겨 두세요.',
+  etc: "적어 둔 상황 중에 자주 겹치는 게 있으면 (예: 회사에서 다 같이 나눠 먹을 때) 그때의 기준을 미리 정해 두세요 ('한 개만', '맛만 보기').",
 };
 const LATE_TIP = {
   work: '일이 늦게 끝나는 날이 많아요. 그런 날은 씻고 바로 누울 수 있게 잘 준비를 미리 해 두세요.',
@@ -399,6 +432,7 @@ function analyzeHealth(start, last, end) {
     cat: { nights: 0, nausea: 0, vomit: 0, dates: [] }, // 고양이를 지켜본 밤 (late에는 넣지 않음)
     why: { snack: {}, late: {}, foods: {} }, weeks: [], ok: { snack: 0, veg: 0, late: 0, food: 0 },
     lateSnack: 0, foodGaps: [], foodEarly: [],
+    snackNotes: [], // 과자 이유를 '기타'로 고르고 적은 글 [{ d, t }]
     weights: Object.keys(state.weights).filter((d) => d >= start && d <= end).sort(),
     labs: labKeys().filter((d) => d >= start && d <= end),
     sq: { days: 0, sum: 0 }, // 식후 스쿼트 (운동 탭 기록) — 혈당 관리로 함께 본다
@@ -415,7 +449,11 @@ function analyzeHealth(start, last, end) {
   for (let d = from; d <= last; d = addDays(d, 1)) {
     const h = state.health[d];
     if (!h) continue;
-    if (h.snack) { hl.snack++; bump(hl.why.snack, h.snackWhy || 'none'); }
+    if (h.snack) {
+      hl.snack++;
+      bump(hl.why.snack, h.snackWhy || 'none');
+      if (h.snackWhy === 'etc' && h.snackNote) hl.snackNotes.push({ d, t: h.snackNote });
+    }
     if (h.veg) hl.veg++;
     if (h.late && catNight(d)) {
       // 아픈 고양이를 지켜본 밤: 습관이 아니므로 늦게 잔 날·주 목표·'늦게 잔 다음 날 과자'에 넣지 않는다
@@ -534,6 +572,10 @@ function healthSection(hl, yearly) {
   const dists = [];
   if (hl.on) {
     if (hl.snack) dists.push(['과자 이유', hDist(hItem('snack'), hl.why.snack)]);
+    if (hl.snackNotes.length) {
+      const sn = hl.snackNotes;
+      dists.push(['과자 기타', `${sn.slice(-8).map(({ d, t }) => `${ml(d)} ${t}`).join(' · ')}${sn.length > 8 ? ` (앞의 ${sn.length - 8}개 더)` : ''}`]);
+    }
     if (hl.late) dists.push(['늦게 잔 이유', hDist(hItem('late'), hl.why.late)]);
     if (hl.cat.nights) dists.push(['고양이 지켜본 밤', `${catWatchText(hl.cat)} — ${hl.cat.dates.map(ml).join(', ')} (늦게 잠 목표에서 뺐어요)`]);
     if (Object.keys(hl.why.foods).length) dists.push(['주의 음식', hDist(hItem('food'), hl.why.foods)]);

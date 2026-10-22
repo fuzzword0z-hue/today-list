@@ -58,8 +58,13 @@ function normalize(s) {
   s.daymode = obj(s.daymode) ? s.daymode : {};
   if (!Array.isArray(s.offDays) || !s.offDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) s.offDays = [1];
   s.health = obj(s.health) ? s.health : {};
-  // 늦게 잔 이유는 여러 개 고르게 바뀜: 예전 한 개짜리 → 목록
-  for (const d in s.health) if (s.health[d] && typeof s.health[d].lateWhy === 'string') s.health[d].lateWhy = [s.health[d].lateWhy];
+  for (const d in s.health) {
+    const h = s.health[d];
+    if (!h) continue;
+    // 늦게 잔 이유는 여러 개 고르게 바뀜: 예전 한 개짜리 → 목록
+    if (typeof h.lateWhy === 'string') h.lateWhy = [h.lateWhy];
+    if (h.snackNote !== undefined && typeof h.snackNote !== 'string') delete h.snackNote;
+  }
   s.hgoal = obj(s.hgoal) ? s.hgoal : {};
   s.weights = obj(s.weights) ? s.weights : {};
   s.labs = obj(s.labs) ? s.labs : {};

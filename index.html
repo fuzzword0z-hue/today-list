@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=23">
   <title>오늘</title>
 </head>
 <body>
@@ -230,17 +230,23 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
           </button>
         </div>
-        <div class="top-row"><h1 class="date-main">감사일기</h1></div>
+        <div class="top-row"><h1 class="date-main">일기</h1></div>
       </header>
       <main class="scroll" id="dy-scroll">
+        <section class="dy-compass" id="dy-compass" aria-label="나침반"></section>
+        <section class="wo-card dy-sec" id="dy-own"></section>
         <section class="wo-card dy-card">
           <div class="wo-head"><span class="wo-name">감사한 일</span><span class="wo-target">한 줄에 하나씩, 작은 것도 좋아요</span>
             <span class="wo-amt dy-count" id="dy-count"></span></div>
           <textarea class="dy-text" id="dy-text" rows="6" maxlength="2000" aria-label="감사일기"></textarea>
           <p class="dy-status" id="dy-status"></p>
         </section>
+        <section class="wo-card dy-sec" id="dy-feel"></section>
+        <section class="wo-card dy-sec" id="dy-q"></section>
+        <section class="wo-card dy-sec" id="dy-shake"></section>
         <section class="wo-card dy-month" id="dy-month"></section>
-        <p class="wo-note">일기는 이 휴대폰에만 저장되고, 통계 탭의 백업 파일(내보내기)에 함께 담겨요.<br>한 달 쓴 뒤 '이번 달 일기 복사'로 채팅에 붙여 넣으면 피드백을 받을 수 있어요.</p>
+        <details class="wo-card dy-env" id="dy-env"></details>
+        <p class="wo-note">점수도 연속 기록도 없어요. 쓰지 못한 날이 있어도 다시 돌아오면 충분해요.<br>일기는 이 휴대폰에만 저장되고, 통계 탭의 백업 파일(내보내기)에 함께 담겨요.<br>한 달 쓴 뒤 '이번 달 일기 복사'로 채팅에 붙여 넣으면 피드백을 받을 수 있어요.</p>
       </main>
     </section>
 
@@ -336,6 +342,22 @@
       </form>
     </div>
 
+    <!-- ───────── 흔들린 순간 시트 (일기 탭) ───────── -->
+    <div class="sheet-wrap" id="sh-sheet" hidden>
+      <div class="backdrop" data-close></div>
+      <form class="sheet" id="sh-form" autocomplete="off" novalidate role="dialog" aria-modal="true" aria-labelledby="sh-title">
+        <div class="sheet-head">
+          <button type="button" class="sheet-btn" data-close>취소</button>
+          <h2 id="sh-title">흔들린 순간</h2>
+          <button type="submit" class="sheet-btn strong">저장</button>
+        </div>
+        <div class="sh-fields" id="sh-fields"></div>
+        <textarea class="ev-memo" id="sh-memo" rows="2" maxlength="300" placeholder="무슨 일이 있었나요? (한 줄이면 충분해요)" aria-label="흔들린 순간 메모"></textarea>
+        <p class="lab-help">욕구는 없애는 게 아니라 알아차리는 거예요. 적는 것만으로 충분해요.</p>
+        <button type="button" class="sheet-del" id="sh-del" hidden>이 기록 지우기</button>
+      </form>
+    </div>
+
     <!-- 선택지 (반복 일정 수정·삭제 범위 등) -->
     <div class="sheet-wrap" id="choice" hidden>
       <div class="backdrop" data-close></div>
@@ -363,18 +385,18 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=22"></script>
-  <script src="js/events.js?v=22"></script>
-  <script src="js/today.js?v=22"></script>
-  <script src="js/calendar.js?v=22"></script>
-  <script src="js/stats.js?v=22"></script>
-  <script src="js/report.js?v=22"></script>
-  <script src="js/care.js?v=22"></script>
-  <script src="js/workout.js?v=22"></script>
-  <script src="js/study.js?v=22"></script>
-  <script src="js/health.js?v=22"></script>
-  <script src="js/diary.js?v=22"></script>
-  <script src="js/backup.js?v=22"></script>
-  <script src="js/main.js?v=22"></script>
+  <script src="js/core.js?v=23"></script>
+  <script src="js/events.js?v=23"></script>
+  <script src="js/today.js?v=23"></script>
+  <script src="js/calendar.js?v=23"></script>
+  <script src="js/stats.js?v=23"></script>
+  <script src="js/report.js?v=23"></script>
+  <script src="js/care.js?v=23"></script>
+  <script src="js/workout.js?v=23"></script>
+  <script src="js/study.js?v=23"></script>
+  <script src="js/health.js?v=23"></script>
+  <script src="js/diary.js?v=23"></script>
+  <script src="js/backup.js?v=23"></script>
+  <script src="js/main.js?v=23"></script>
 </body>
 </html>

@@ -1249,5 +1249,55 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .dy-all { margin-top: 10px; }
 .dy-all li b { display: block; color: var(--text); font-weight: 600; }
 .dy-copy { margin-top: 10px; }
+.dy-part { display: block; margin-top: 4px; }
+.dy-part em { margin-right: 6px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--c-me-ink); }
+
+/* 일기: 나침반 (내가 지향하는 문장) */
+.dy-compass { margin-bottom: 10px; padding: 6px 12px 8px; border-radius: var(--radius); background: var(--c-me-soft); }
+.dy-cp-head { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.dy-cp-head > span:first-child, .dy-cp-toggle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; color: var(--c-me-ink); text-align: left; }
+.dy-cp-toggle { min-height: 36px; }
+.dy-cp-toggle small { margin-left: 4px; font-size: 12.5px; font-weight: 500; color: var(--text-2); }
+.dy-cp-btn { flex: none; min-height: 36px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.dy-cp-btn.strong { color: var(--c-me-ink); }
+.dy-cp-list { margin: 0 0 4px; padding: 0; list-style: none; }
+.dy-cp-list li { position: relative; padding: 3px 0 3px 14px; font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text); word-break: keep-all; }
+.dy-cp-list li::before { content: ''; position: absolute; left: 2px; top: 11px; width: 5px; height: 5px; border-radius: 50%; background: var(--c-me); }
+.dy-cp-in { display: block; width: 100%; height: 40px; margin-top: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+
+/* 일기: 인정한 것 · 마음 이름 · 질문 · 흔들린 순간 · 환경 */
+.dy-chips button[aria-pressed="true"] { background: var(--c-me-soft); border-color: var(--c-me); color: var(--c-me-ink); font-weight: 600; }
+.dy-chips .dy-add-chip { border-style: dashed; }
+/* 일기 카드 머리: 설명은 제목 아래 한 줄로 (좁은 화면에서 제목이 꺾이지 않게) */
+.dy-sec .wo-head { flex-wrap: wrap; align-items: center; row-gap: 2px; }
+.dy-sec .wo-target { flex-basis: 100%; order: 3; }
+.dy-sec .wo-head .dy-cp-btn { margin-left: auto; }
+.dy-kept { margin-bottom: 4px; }
+.dy-kept > span { display: block; margin: 0 2px 6px; font-size: 12px; color: var(--text-3); }
+.dy-line { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; }
+.dy-no { flex: none; width: 16px; padding-top: 10px; text-align: center; font-size: 13px; font-weight: 700; color: var(--c-me-ink); }
+.dy-in { display: block; flex: 1; width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.4; resize: none; overflow: hidden; }
+.dy-in:focus, .dy-cp-in:focus { outline: none; border-color: var(--accent); }
+.dy-self-q { margin: 12px 2px 6px; font-size: 13px; font-weight: 600; color: var(--c-me-ink); }
+.dy-question { margin: 0 0 8px; font-size: 15px; font-weight: 600; line-height: 1.45; word-break: keep-all; }
+.dy-alone { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.dy-alone > span { font-size: 13px; color: var(--text-2); }
+.dy-alone > .chips { flex: 1 1 100%; }
+.dy-alone small { font-size: 12px; color: var(--text-3); }
+.dy-sh-list { margin: 0; padding: 0; list-style: none; }
+.dy-sh-list button { display: block; width: 100%; margin-bottom: 6px; padding: 8px 10px; border-radius: 10px; background: var(--bg); text-align: left; font-size: 13.5px; line-height: 1.4; color: var(--text); }
+.dy-sh-list small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-3); }
+.dy-hint { margin: 8px 2px 0; font-size: 12px; line-height: 1.5; color: var(--text-3); word-break: keep-all; }
+.dy-env > summary { display: flex; align-items: baseline; gap: 8px; min-height: 28px; cursor: pointer; list-style: none; }
+.dy-env > summary::-webkit-details-marker { display: none; }
+.dy-env > summary::after { content: '▾'; margin-left: auto; color: var(--text-3); }
+.dy-env[open] > summary::after { content: '▴'; }
+.dy-env-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 12px; }
+.dy-env-row label { flex: none; width: 112px; font-size: 13px; color: var(--text-2); }
+.dy-env-row label small { display: block; font-size: 11.5px; color: var(--text-3); }
+.dy-env-note { flex-basis: 100%; padding-left: 120px; font-size: 12px; color: var(--text-3); }
+.sh-group p { margin: 14px 2px 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.sh-group small { font-weight: 400; color: var(--text-3); }
+.r-mind .r-dist li { word-break: keep-all; }
 .backup-size { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
 .backup-size.warn { color: var(--danger); font-weight: 600; }

@@ -7,17 +7,21 @@
  *   rows = [시작, 끝, 내용] 줄 (출근일·쉬는 날 같음, 4줄부터 다 쓰면 한 줄씩 늘어남), review = 아침 복습
  * state.studies = { 'YYYY-MM-DD': { mode, review, rows, min, at } }   그날 기록 (min = 공부한 분)
  *   예전 평일 기록은 rows 대신 a(7:00–8:30) · b(9:30–11:00) 글자로 남아 있다 → 그대로 읽는다.
- * 출근일 계획(7:00–8:30 · 9:30–11:00)은 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
- * (일정이 틀어진 날도 실제로 공부한 시간을 그대로 적게). 계획을 지켰는지는 적은 시간이 계획과 절반 이상 겹치는지로 본다.
+ * 출근일 계획은 저녁 7:10–8:40이 기본이고 (실제로 공부를 시작한 시각이 거의 늘 저녁 7시 10분 전후였다),
+ * 아침 7:00–8:30 · 9:30–11:00은 '되는 날만'. 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
+ * (일정이 틀어진 날도 실제로 공부한 시간을 그대로 적게). 계획을 지켰는지는 적은 시간이 계획과 절반 이상 겹치는지로 보고,
+ * 저녁·아침 중 하나라도 지킨 출근일을 '출근일 공부를 한 날'로 센다.
  * 출근일·쉬는 날 (안의 값은 예전 이름 그대로 'weekday' · 'weekend'):
  *   기본은 '매주 쉬는 요일'(state.offDays, 처음엔 월요일 — 박물관 휴관일). 토·일은 번갈아 출근하므로 기본은 출근일.
  *   스케줄 휴무·연차·공휴일 다음 날 휴관은 캘린더의 '쉬는 날 고르기'나 운동·공부 탭 위 토글로 그날만 바꾼다
- *   (state.daymode). 쉬는 날엔 운동 탭의 8:30–9:30 루틴이 숨겨지고, 리포트의 '출근일 루틴'에서 빠진다. */
+ *   (state.daymode). 쉬는 날엔 운동 탭의 8:30–9:30 루틴이 숨겨지고, 리포트의 '출근일 공부'·'8:30–9:30 루틴'에서 빠진다. */
 
 const STUDY_BLOCKS = [
-  { id: 'a', time: '7:00–8:30', s: '07:00', e: '08:30', min: 90 },
+  { id: 'pm', time: '저녁 7:10–8:40', s: '19:10', e: '20:40', min: 90, main: true },
+  { id: 'a', time: '아침 7:00–8:30', s: '07:00', e: '08:30', min: 90 },
   { id: 'b', time: '9:30–11:00', s: '09:30', e: '11:00', min: 90 },
 ];
+const PM_BLOCK = STUDY_BLOCKS[0];
 const ROWS_MIN = 4; // 처음 보이는 줄 수
 const ROWS_MAX = 8; // 다 쓰면 한 줄씩 늘어나는 끝
 const EXAM_DAYS = 120; // 공부 탭 위에 D-day로 보여 줄 공적 일정 범위
@@ -37,7 +41,15 @@ const stRows = (s, n) => Array.from({ length: n || Math.min(ROWS_MAX, Math.max(R
   (_, i) => ({ s: '', e: '', t: '', ...((s.rows || [])[i] || {}) }));
 const toMin = (hm) => { const [h, m] = (hm || '').split(':').map(Number); return h * 60 + m; };
 const fmtMin = (n) => (n < 60 ? `${n}분` : `${Math.floor(n / 60)}시간${n % 60 ? ` ${n % 60}분` : ''}`);
-const rowMin = (r) => (r.s && r.e && toMin(r.e) > toMin(r.s) ? toMin(r.e) - toMin(r.s) : 0);
+/* 줄의 시간 (분). 끝이 시작보다 이르면 자정을 넘긴 것으로 본다 (6시간 이내만, 예: 23:30–0:40).
+ * 그보다 길면 시간을 잘못 고른 것(예: 오전 11:00을 23:00으로)으로 보고 0분 — rowBad로 알려 준다 */
+const OVERNIGHT_MAX = 6 * 60;
+const rowMin = (r) => {
+  if (!r.s || !r.e) return 0;
+  const d = toMin(r.e) - toMin(r.s);
+  return d > 0 ? d : d < 0 && d + 1440 <= OVERNIGHT_MAX ? d + 1440 : 0;
+};
+const rowBad = (r) => !!(r.s && r.e && r.s !== r.e && !rowMin(r));
 const hm = (t) => t.replace(/^0(?=\d)/, ''); // 07:00 → 7:00
 
 /* 평일 계획 칸과 겹친 시간 (분). 절반 이상 겹치면 그 칸을 지킨 것으로 본다 */
@@ -86,7 +98,9 @@ function stShown(s) {
   return stRows(s, Math.min(ROWS_MAX, Math.max(ROWS_MIN, last + 2)));
 }
 const rowHtml = (r, i, ro) => timeRowHtml(r, i, ro, i ? '공부한 내용' : '공부한 내용 (예: 기출 10문제, 틀린 것 2)');
-const planHtml = (rows) => `<div class="st-plan"><span>계획</span>${STUDY_BLOCKS.map((b) => `<button class="st-chip" data-plan="${b.id}" aria-pressed="${blockMin(rows, b) >= b.min / 2}">${b.time}</button>`).join('')}</div>`;
+const planChip = (rows, b) => `<button class="st-chip" data-plan="${b.id}" aria-pressed="${blockMin(rows, b) >= b.min / 2}">${b.time}</button>`;
+const planHtml = (rows) => `<div class="st-plan"><span>계획</span>${planChip(rows, PM_BLOCK)}</div>
+  <div class="st-plan st-plan-opt"><span>되는 날만</span>${STUDY_BLOCKS.filter((b) => !b.main).map((b) => planChip(rows, b)).join('')}</div>`;
 
 function renderStudy() {
   const s = stOf();
@@ -187,6 +201,7 @@ $('st-body').addEventListener('input', (e) => {
   const i = +row.dataset.i;
   rows[i][f] = e.target.value;
   editStudy({ rows }, true);
+  row.classList.toggle('bad', rowBad(rows[i]));
   $('st-total').textContent = fmtMin(rows.reduce((a, r) => a + rowMin(r), 0));
   for (const c of document.querySelectorAll('#st-body [data-plan]')) {
     const b = STUDY_BLOCKS.find((x) => x.id === c.dataset.plan);

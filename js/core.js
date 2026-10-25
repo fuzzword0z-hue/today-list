@@ -355,11 +355,13 @@ function bindRecDate(el, onPick) {
 
 /* ───────── 시간 줄 [시작 ~ 끝 + 내용] (공부 탭, 운동 탭의 쉬는 날·그 밖의 운동) ─────────
  * 내용 칸은 쓰는 만큼 늘어난다 */
+/* [시작 ~ 끝 + 내용] 한 줄 (공부 · 운동). 끝이 시작보다 한참 이르면 시간을 확인하라고 알려 준다 (rowBad) */
 function timeRowHtml(r, i, ro, ph) {
-  return `<div class="st-row" data-i="${i}">
+  return `<div class="st-row${rowBad(r) ? ' bad' : ''}" data-i="${i}">
   <input type="time" class="st-time" data-f="s" value="${r.s || ''}" aria-label="${i + 1}번째 시작 시간"${ro}>
   <span class="st-tilde">~</span>
   <input type="time" class="st-time" data-f="e" value="${r.e || ''}" aria-label="${i + 1}번째 끝 시간"${ro}>
+  <p class="st-warn" role="status">끝 시각이 시작보다 빨라요. 오전·오후를 확인해 주세요 (0분으로 세요)</p>
   <textarea class="st-row-text" data-f="t" rows="1" maxlength="300" placeholder="${ph}" aria-label="${i + 1}번째 내용"${ro}>${esc(r.t || '')}</textarea>
 </div>`;
 }

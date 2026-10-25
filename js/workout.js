@@ -395,6 +395,7 @@ $('wo-routine').addEventListener('input', (e) => {
   c.rows = rows;
   state.workout = { date: woRecDate(), touched: today, c };
   saveSoon();
+  row.classList.toggle('bad', rowBad(rows[i]));
   const m = rows.reduce((a, r) => a + rowMin(r), 0);
   $('x-total').textContent = m ? fmtMin(m) : '';
   // 마지막 줄을 쓰기 시작하면 빈 줄을 하나 더

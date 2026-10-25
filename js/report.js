@@ -64,6 +64,27 @@ $('report-back').addEventListener('click', () => {
 });
 
 /* ───────── 분석 ───────── */
+/* 앱을 처음 쓴 날: 가장 이른 기록 (할 일 · 고양이 컨디션 · 케어 체크 · 운동 · 공부 · 건강 · 체중 · 진료 · 일기).
+ * 첫 달(첫해)은 이 날부터 센다 — 쓰기 전 날들을 '기록 없음'으로 세지 않게 */
+function firstUse() {
+  let f = state.hstart || today;
+  const see = (k) => { if (k < f) f = k; };
+  for (const o of [state.days, state.cond, state.workouts, state.studies, state.health, state.weights, state.labs, state.diary]) for (const k in o) see(k);
+  for (const ev of state.events) for (const k in ev.done || {}) see(k);
+  return f;
+}
+/* 고양이가 아프거나(구토 · 밤에 지켜봄) 병원에 간 날 — 이런 날 기록이 비어도 다그치지 않는다 */
+const catHardDay = (k, visitDays) => {
+  const c = condOf(k);
+  return !!(c && c.vo && c.vo !== '0') || visitDays.has(k) || catNight(k) || catNight(addDays(k, -1));
+};
+/* 출근일 공부 시작 시각 (분) → '저녁 7:10' */
+const clockWord = (n) => {
+  const h = Math.floor(n / 60), mm = n % 60;
+  const h12 = h % 12 || 12;
+  return `${h < 12 ? '아침' : h < 18 ? '오후' : '저녁'} ${h12}:${pad(mm)}`;
+};
+
 function analyze(id) {
   const { start, end } = reportRange(id);
   const yearly = isYear(id);
@@ -71,8 +92,10 @@ function analyze(id) {
   const last = end < today ? end : addDays(today, -1);
   const mid = yearly ? `${id}-07-01` : `${id}-16`;
   const box = () => ({ done: 0, total: 0, days: 0 });
+  const fu = firstUse();
+  const from = fu > start ? fu : start; // 첫 달(첫해)은 쓰기 시작한 날부터
   const m = {
-    id, yearly, start, end, last,
+    id, yearly, start, end, last, from, empty: [],
     days: 0, active: 0, total: 0, done: 0, moved: 0, open: 0, perfect: 0,
     streakBest: 0, gap: { len: 0, from: null, to: null },
     wd: Array.from({ length: 7 }, box), // 0 = 월요일
@@ -84,7 +107,7 @@ function analyze(id) {
   const add = (b, done, total) => { b.done += done; b.total += total; b.days++; };
 
   let run = 0, gapRun = 0, gapFrom = null;
-  for (let k = start; k <= last; k = addDays(k, 1)) {
+  for (let k = from; k <= last; k = addDays(k, 1)) {
     m.days++;
     const items = state.days[k] || [];
     const total = items.length;
@@ -112,6 +135,7 @@ function analyze(id) {
       }
       gapRun = 0; gapFrom = null;
     } else {
+      m.empty.push(k);
       gapRun++;
       gapFrom = gapFrom || k;
       if (gapRun > m.gap.len) m.gap = { len: gapRun, from: gapFrom, to: k };
@@ -141,6 +165,11 @@ function analyze(id) {
   m.visits = vetDays(start, last)
     .filter((d) => !isSkipped(d.ev, d.k))
     .map((d) => ({ ev: d.ev, k: d.k, done: isDone(d.ev, d.k) }));
+  // 할 일 기록이 빈 날 중 고양이가 아프거나 병원에 간 날
+  const visitDays = new Set(m.visits.filter((v) => v.done).map((v) => v.k));
+  m.emptyHard = m.empty.filter((k) => catHardDay(k, visitDays)).length;
+  m.gap.hard = 0;
+  if (m.gap.len) for (let k = m.gap.from; k <= m.gap.to; k = addDays(k, 1)) if (catHardDay(k, visitDays)) m.gap.hard++;
 
   // 고양이 컨디션
   const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [], th: 0 };
@@ -188,10 +217,11 @@ function analyze(id) {
   }
   m.wo = wo;
 
-  // 공부 + 출근일 루틴 (7:00–8:30 공부 · 8:30–9:30 루틴 · 9:30–11:00 공부). 처음 공부를 기록한 날부터 센다
+  // 공부 + 출근일 계획 (저녁 7:10–8:40이 기본, 아침 7:00–8:30 · 9:30–11:00은 되는 날만) + 8:30–9:30 루틴.
+  // kept = 저녁·아침 중 하나라도 지킨 출근일. starts = 출근일에 공부를 시작한 시각 (습관 찾기). 처음 공부를 기록한 날부터 센다
   const st = {
-    days: 0, min: 0, review: 0, span: 0, wdays: 0, a: 0, b: 0, rt: 0, full: 0, entries: [],
-    wd: Array.from({ length: 7 }, () => ({ n: 0, full: 0 })), months: yearly ? Array(12).fill(0) : null,
+    days: 0, min: 0, review: 0, span: 0, wdays: 0, pm: 0, am: 0, kept: 0, rt: 0, ex20: 0, entries: [], starts: [],
+    wd: Array.from({ length: 7 }, () => ({ n: 0, kept: 0 })), months: yearly ? Array(12).fill(0) : null,
   };
   const firstSt = Object.keys(state.studies).sort()[0];
   if (firstSt && firstSt <= last) {
@@ -207,19 +237,35 @@ function analyze(id) {
         if (st.months) st.months[parse(k).getMonth()] += rec.min || 0;
       }
       if ((rec ? rec.mode : dayMode(k)) !== 'weekday') continue;
-      const a = blockDone(rec, STUDY_BLOCKS[0]), b = blockDone(rec, STUDY_BLOCKS[1]), rt = !!(state.workouts[k] && state.workouts[k].routine);
+      const [pm, a, b] = STUDY_BLOCKS.map((bl) => blockDone(rec, bl));
+      const wr = state.workouts[k];
       st.wdays++;
-      st.a += a; st.b += b; st.rt += rt;
+      st.pm += pm;
+      st.am += a || b;
+      st.kept += pm || a || b;
+      st.rt += !!(wr && wr.routine);
+      st.ex20 += !!(wr && wr.ex20);
       const w = st.wd[parse(k).getDay()];
       w.n++;
-      if (a && b && rt) { st.full++; w.full++; }
+      if (pm || a || b) w.kept++;
+      const ss = ((rec && rec.rows) || []).filter((r) => rowMin(r)).map((r) => toMin(r.s));
+      if (ss.length) st.starts.push(Math.min(...ss));
     }
   }
   m.st = st;
   m.hl = analyzeHealth(start, last, end);
   // 감사일기: 쓴 날 · 줄 수 (내용은 리포트에 넣지 않는다 — 피드백은 채팅에서)
-  m.dy = { days: 0, lines: 0 };
+  m.dy = { days: 0, lines: 0, span: 0 };
   for (const k in state.diary) if (k >= start && k <= last) { m.dy.days++; m.dy.lines += diaryLines(state.diary[k].t); }
+  const firstDy = Object.keys(state.diary).sort()[0]; // 쓴 날 비율은 처음 쓴 날부터
+  if (firstDy && firstDy <= last) m.dy.span = diffDays(last, firstDy > start ? firstDy : start) + 1;
+
+  // 시간이 이상한 줄 (끝이 시작보다 한참 이름 → 0분으로 셌다): 공부 · 운동 기록
+  m.badRows = [];
+  for (const [o, tab] of [[state.studies, '공부'], [state.workouts, '운동']]) {
+    for (const k in o) if (k >= start && k <= last) for (const r of o[k].rows || []) if (rowBad(r)) m.badRows.push({ k, r, tab });
+  }
+  m.badRows.sort((x, y) => x.k.localeCompare(y.k));
 
   // 일정 수 (투약 같은 반복 케어는 빼고)
   m.evCount = { work: 0, life: 0, care: 0 };
@@ -242,7 +288,7 @@ function score(m) {
   }
   if (m.careSched) parts.push({ label: '케어 기록', v: m.careRecorded / m.careSched, w: 0.2 });
   if (m.wo.days) parts.push({ label: '운동 (한 날)', v: m.wo.days / m.wo.span, w: 0.2 });
-  if (m.st.days && m.st.wdays) parts.push({ label: '출근일 루틴', v: m.st.full / m.st.wdays, w: 0.2 });
+  if (m.st.days && m.st.wdays) parts.push({ label: '출근일 공부', v: m.st.kept / m.st.wdays, w: 0.2 });
   const hw = m.hl.weeks.length;
   if (hw) parts.push({ label: '건강 습관 (주 목표)', v: (m.hl.ok.snack + m.hl.ok.veg + m.hl.ok.late + m.hl.ok.food) / (hw * 4), w: 0.2 });
   if (!parts.length) return null;
@@ -289,7 +335,14 @@ function feedback(m, p) {
     if (c.sched >= 3 && c.recorded / c.sched >= 0.95) good.push(`${c.ev.title} ${c.sched}번 중 ${c.recorded}번을 기록했어요. 빠짐없이 챙기고 있어요.`);
   }
   const S = m.st;
-  if (S.wdays >= 5 && S.full / S.wdays >= 0.7) good.push(`출근일 ${S.wdays}일 중 ${S.full}일, 루틴(7:00 공부 · 8:30 루틴 · 9:30 공부)을 모두 지켰어요.`);
+  if (S.wdays >= 5 && S.kept / S.wdays >= 0.7) good.push(`출근일 ${S.wdays}일 중 ${S.kept}일 공부 계획을 지켰어요 (저녁 ${S.pm}일${S.am ? ` · 아침 ${S.am}일` : ''}).`);
+  // 출근일에 공부를 시작한 시각이 한결같으면: 그 시간이 이미 습관
+  if (S.starts.length >= 3) {
+    const ss = [...S.starts].sort((x, y) => x - y);
+    const mid = ss.length % 2 ? ss[(ss.length - 1) / 2] : (ss[ss.length / 2 - 1] + ss[ss.length / 2]) / 2;
+    const near = ss.filter((x) => Math.abs(x - mid) <= 30).length;
+    if (near / ss.length >= 0.75) good.push(`출근일 공부는 주로 ${clockWord(Math.round(mid / 5) * 5)} 전후에 시작했어요 (${ss.length}번 중 ${near}번). 이 시간이 이미 습관이 됐어요.`);
+  }
   if (S.min >= (Y ? 6000 : 1200)) good.push(`공부를 ${fmtMin(S.min)} 했어요. 꾸준히 쌓이고 있어요.`);
   if (S.days >= 5 && S.review / S.days >= 0.6) good.push(`아침 복습을 ${S.review}일 했어요. 떠올려 보는 공부가 습관이 되고 있어요.`);
   if (m.wo.ex20 >= (Y ? 80 : 8)) good.push(`20분 운동을 ${m.wo.ex20}일 했어요.`);
@@ -335,23 +388,27 @@ function feedback(m, p) {
     improve.push(`완료 체크의 ${pct(m.hours.night / m.hours.n)}%가 밤 10시 이후에 몰려 있어요. 중요한 일은 오전에 두면 하루가 더 여유로워요.`);
   }
   if (m.active && m.days >= 7 && m.active / m.days < 0.6) {
-    improve.push(`기록이 없는 날이 ${m.days - m.active}일이에요. 아침에 1분만 열어서 오늘 할 일을 적어 보세요.`);
-    goals.push(`기록한 날 ${Math.min(m.days, Math.round(m.days * 0.8))}일 이상`);
+    const hard = m.emptyHard ? ` 그중 ${m.emptyHard}일은 고양이가 아프거나 병원에 간 날이었어요. 그런 날은 돌봄이 먼저예요.` : '';
+    improve.push(`기록이 없는 날이 ${m.days - m.active}일이에요.${hard} 아침에 1분만 열어서 오늘 할 일을 적어 보세요.`);
+    // 다음 기간 길이 기준 (첫 달은 쓰기 시작한 날부터라 짧다)
+    const next = Y ? 365 : diffDays(monthEnd(addDays(m.end, 1)), addDays(m.end, 1)) + 1;
+    goals.push(`기록한 날 ${Math.round(next * 0.8)}일 이상`);
   }
   if (S.wdays >= 5) {
-    const blocks = [
-      ['a', '7:00–8:30 공부를', '고양이 케어를 마치면 바로 앉을 수 있게, 전날 밤 11시에 내일 7시에 풀 문제 범위를 정해 두세요.'],
-      ['rt', '8:30–9:30 루틴을', '샤워를 마지막 순서로 두면 씻고 나와서 바로 9:30 공부로 이어져요.'],
-      ['b', '9:30–11:00 공부를', '8:30–9:30에 폰을 멀리 두고, 샤워를 끝내자마자 책상에 앉아 보세요.'],
-    ].map(([f, name, tip]) => ({ name, tip, rate: S[f] / S.wdays, n: S[f] }));
-    const weak = blocks.reduce((x, y) => (y.rate < x.rate ? y : x));
-    if (weak.rate <= 0.6) improve.push(`${weak.name} 지킨 날이 출근일 ${S.wdays}일 중 ${weak.n}일이에요. ${weak.tip}`);
-    const wds = S.wd.map((w, i) => ({ i, ...w, rate: w.n ? w.full / w.n : null })).filter((w) => w.n >= 2); // 토·일도 출근일이 될 수 있어 모든 요일
+    const kr = S.kept / S.wdays;
+    if (kr <= 0.6) improve.push(`출근일 공부를 한 날이 ${S.wdays}일 중 ${S.kept}일이에요. 저녁 7:10에 책상에 앉는 것만 정해 두고, 풀 범위는 점심때 미리 골라 두세요.`);
+    // 8:30–9:30 루틴: 세 가지를 다 못 채워도 20분 운동을 했으면 그걸 먼저 알아준다
+    if (S.rt / S.wdays <= 0.6) {
+      improve.push(S.ex20 > S.rt
+        ? `8:30–9:30 루틴 세 가지를 다 채운 날은 ${S.wdays}일 중 ${S.rt}일이지만, 20분 운동은 ${S.ex20}일 했어요. 바쁜 아침엔 20분 운동 하나만 지켜도 잘한 거예요.`
+        : `8:30–9:30 루틴을 다 채운 날이 출근일 ${S.wdays}일 중 ${S.rt}일이에요. 20분 운동 하나부터 시작해 보세요.`);
+    }
+    const wds = S.wd.map((w, i) => ({ i, ...w, rate: w.n ? w.kept / w.n : null })).filter((w) => w.n >= 2); // 토·일도 출근일이 될 수 있어 모든 요일
     if (wds.length >= 3) {
       const worst = wds.reduce((x, y) => (y.rate < x.rate ? y : x));
-      if (worst.rate <= S.full / S.wdays - 0.3) improve.push(`${WD[worst.i]}요일에 출근일 루틴이 자주 무너져요 (${worst.n}번 중 ${worst.full}번). 그 요일엔 공부 목표를 조금 줄여 보세요.`);
+      if (worst.rate <= kr - 0.3) improve.push(`${WD[worst.i]}요일엔 출근일 공부를 자주 못 했어요 (${worst.n}번 중 ${worst.kept}번). 그 요일엔 공부 목표를 조금 줄여 보세요.`);
     }
-    if (S.full / S.wdays < 0.8) goals.push(`출근일 루틴 주 ${Math.min(5, Math.max(3, Math.round((S.full / S.wdays) * 5) + 1))}일`);
+    if (kr < 0.8) goals.push(`출근일 저녁 공부 주 ${Math.min(5, Math.max(3, Math.round(kr * 5) + 1))}일`);
   }
   if (S.days >= 5 && S.review / S.days < 0.3) improve.push(`아침 복습을 ${S.review}일 했어요. 전날 밤에 헷갈린 것 5개만 종이에 적어 머리맡에 두면 아침 15분이 쉬워져요.`);
   if (m.wo.days && m.wo.span >= 10 && m.wo.days / m.wo.span < 0.4) {
@@ -376,7 +433,16 @@ function feedback(m, p) {
     goals.push(`${c.ev.title} 체크 100%`);
   }
   if (m.open >= 5) fix.push(`끝내지도, 미루지도 않고 남은 일이 ${m.open}개예요. 하루를 마칠 때 남은 일은 '내일로' 넘기거나 지워서 정리해 주세요.`);
-  if (m.active && m.gap.len >= 4) fix.push(`${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 바쁜 날엔 한 줄이라도 남겨 보세요.`);
+  if (m.active && m.gap.len >= 4) {
+    fix.push(m.gap.hard
+      ? `${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 그중 ${m.gap.hard}일은 고양이를 돌본 날이에요 — 그런 날은 한 줄만 남겨도 충분해요.`
+      : `${ml(m.gap.from)}–${ml(m.gap.to)} ${m.gap.len}일 동안 기록이 없었어요. 바쁜 날엔 한 줄이라도 남겨 보세요.`);
+  }
+  if (m.badRows.length) {
+    const list = m.badRows.slice(0, 3).map(({ k, r, tab }) => `${ml(k)} ${tab} ${hm(r.s)}–${hm(r.e)}`).join(', ');
+    const tabs = [...new Set(m.badRows.map((b) => b.tab))].join('·');
+    fix.push(`끝 시각이 시작보다 빠른 줄이 있어 0분으로 셌어요 (${list}${m.badRows.length > 3 ? ` 외 ${m.badRows.length - 3}줄` : ''}). ${tabs} 탭에서 기록 날짜를 그 날로 바꿔 시간을 고쳐 주세요.`);
+  }
   if (r !== null && m.total >= 10 && r < 0.5) fix.push(`완료율이 ${pct(r)}%로 절반에 못 미쳐요. 할 일 수를 줄이는 것부터 시작해 보세요.`);
   fix.push(...hf.fix);
   goals.push(...hf.goals);
@@ -407,6 +473,8 @@ function cheer(m, s, W, prev) {
   if (extra.length) out.push(`${W.this} ${extra.join('과 ')}도 챙겼어요. 내 몸과 목표를 함께 돌보고 있어요.`);
   if (prev && prev.rate !== null && m.rate !== null && m.rate > prev.rate + 0.03) out.push(`무엇보다 ${W.prev}보다 나아졌다는 게 가장 큰 성과예요.`);
   if (m.dy.days >= 3) out.push(`감사일기를 ${m.dy.days}일 썼어요. 작은 감사를 알아보는 눈이 자라고 있어요.`);
+  // 고양이가 여러 날 토한 달: 다른 기록이 줄어든 걸 탓하지 않는다
+  if (m.cond.vomitDays >= 2) out.push(`고양이가 ${m.cond.vomitDays}일 토해서 마음 졸인 날${m.cond.vomitDays >= 4 ? '이 많았어요' : '들이 있었어요'}. 그런 날 다른 기록이 줄어든 건 당연한 일이에요.`);
   // 아픈 고양이를 지켜보느라 늦게 잔 밤: 탓하지 않고 다독인다
   if (m.hl && m.hl.cat.nights) out.push(`고양이가 오심·구토로 힘들어해서 밤에 지켜본 날이 ${m.hl.cat.nights}번 있었어요. 어쩔 수 없는 밤이니 다음 날 아침 루틴은 가볍게 잡아도 괜찮아요.`);
   out.push(t >= 70 ? `이 흐름 그대로 ${W.next}도 함께 가요.` : `완벽하지 않아도 괜찮아요. ${W.next}엔 하루 한 가지만 확실히 끝내는 것부터 다시 시작해요.`);
@@ -422,7 +490,7 @@ function renderReport(id) {
   $('report-title').textContent = reportName(id);
   const m = analyze(id);
   const el = $('report');
-  const fmtRange = `${md(m.start)} – ${md(m.end)}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
+  const fmtRange = `${md(m.start)} – ${md(m.end)}${m.from > m.start && m.from <= m.last ? ` · ${md(m.from)}부터 쓰기 시작` : ''}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
   const [hlSec, hlLines] = healthSection(m.hl, m.yearly);
   if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec && !m.dy.days)) {
@@ -461,7 +529,7 @@ function renderReport(id) {
     const d = Math.round((b - a) * 100) / 100;
     tiles.push(['체중', `${b}<small>kg</small>`, `<small>${d > 0 ? '+' : ''}${d}kg (${a}→${b})</small>`]);
   }
-  if (m.dy.days) tiles.push(['감사일기', `${m.dy.days}<small>/${diffDays(m.last, m.start) + 1}일</small>`, `<small>${m.dy.lines}줄</small>`]);
+  if (m.dy.days) tiles.push(['감사일기', `${m.dy.days}<small>/${m.dy.span}일</small>`, `<small>${m.dy.lines}줄</small>`]);
   const ev = m.evCount;
   if (ev.work + ev.life + ev.care) tiles.push(['일정', `${ev.work + ev.life + ev.care}<small>개</small>`, `<small>공적 ${ev.work} · 사적 ${ev.life}${ev.care ? ` · 케어 ${ev.care}` : ''}</small>`]);
 
@@ -510,10 +578,10 @@ function renderReport(id) {
       ['아침 복습', `${S.review}<small>일</small>`, ''],
     ];
     if (S.wdays) {
-      tl.push(['출근일 루틴 다 지킨 날', of(S.full), '']);
-      tl.push(['7:00–8:30 공부', of(S.a), '']);
-      tl.push(['8:30–9:30 루틴', of(S.rt), '']);
-      tl.push(['9:30–11:00 공부', of(S.b), '']);
+      tl.push(['출근일 공부', of(S.kept), `<small>저녁 ${S.pm} · 아침 ${S.am}</small>`]);
+      tl.push(['저녁 7:10–8:40', of(S.pm), '']);
+      tl.push(['8:30–9:30 루틴', of(S.rt), S.ex20 > S.rt ? `<small>20분 운동 ${S.ex20}일</small>` : '']);
+      if (S.am) tl.push(['아침 공부 (되는 날만)', `${S.am}<small>일</small>`, '']);
     }
     for (const [l, v, d] of tl) stLines.push(`- ${l}: ${v.replace(/<[^>]+>/g, '')}${d ? ` (${d.replace(/<[^>]+>/g, '')})` : ''}`);
 
@@ -544,7 +612,7 @@ function renderReport(id) {
     stSec = `<section class="r-sec"><h2>공부</h2>
       <div class="r-tiles">${tl.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>
       ${chart}${entriesHtml}
-      <p class="r-tip">공부 탭의 '오늘 공부 완료'로 남긴 기록이에요. 출근일 루틴은 운동 탭의 8:30–9:30 루틴까지 세 칸을 모두 채운 출근일이에요.</p></section>`;
+      <p class="r-tip">공부 탭의 '오늘 공부 완료'로 남긴 기록이에요. 출근일 공부는 저녁 7:10–8:40이나 아침 공부(7:00–8:30 · 9:30–11:00) 중 하나라도 절반 넘게 한 출근일이에요. 8:30–9:30 루틴은 운동 탭의 세 칸을 모두 채운 날이에요.</p></section>`;
   }
 
   let monthsChart = '';

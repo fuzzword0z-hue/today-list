@@ -6,22 +6,19 @@
  *   date = 이 내용을 기록할 날 (위 '기록 날짜'), touched = 마지막으로 만진 날 (오늘이 아니면 '지난 날 내용 남아 있음')
  *   rows = [시작, 끝, 내용] 줄 (출근일·쉬는 날 같음, 4줄부터 다 쓰면 한 줄씩 늘어남), review = 아침 복습
  * state.studies = { 'YYYY-MM-DD': { mode, review, rows, min, at } }   그날 기록 (min = 공부한 분)
- *   예전 평일 기록은 rows 대신 a(7:00–8:30) · b(9:30–11:00) 글자로 남아 있다 → 그대로 읽는다.
- * 출근일 계획은 저녁 7:10–8:40이 기본이고 (실제로 공부를 시작한 시각이 거의 늘 저녁 7시 10분 전후였다),
- * 아침 7:00–8:30 · 9:30–11:00은 '되는 날만'. 칸으로 고정하지 않고, 눌러서 빈 줄에 시간을 채우는 버튼으로만 둔다
- * (일정이 틀어진 날도 실제로 공부한 시간을 그대로 적게). 계획을 지켰는지는 적은 시간이 계획과 절반 이상 겹치는지로 보고,
- * 저녁·아침 중 하나라도 지킨 출근일을 '출근일 공부를 한 날'로 센다.
+ *   예전 평일 기록은 rows 대신 a(1차) · b(2차) 글자로 남아 있다 → 그대로 읽는다.
+ * 출근일 퇴근 후 루틴 (모두 저녁): 1차 공부 7:00–8:30 → 8:30–9:30 운동·집안일·샤워 (운동 탭) → 2차 공부 9:30–11:00.
+ * 공부 탭은 출근일도 쉬는 날처럼 시간을 고르고 공부한 내용을 적기만 한다 (계획 버튼 없음).
+ * 루틴을 지켰는지는 리포트에서만 본다: 적은 시간이 1차·2차 시간과 절반 이상 겹치면 지킨 것.
  * 출근일·쉬는 날 (안의 값은 예전 이름 그대로 'weekday' · 'weekend'):
  *   기본은 '매주 쉬는 요일'(state.offDays, 처음엔 월요일 — 박물관 휴관일). 토·일은 번갈아 출근하므로 기본은 출근일.
  *   스케줄 휴무·연차·공휴일 다음 날 휴관은 캘린더의 '쉬는 날 고르기'나 운동·공부 탭 위 토글로 그날만 바꾼다
  *   (state.daymode). 쉬는 날엔 운동 탭의 8:30–9:30 루틴이 숨겨지고, 리포트의 '출근일 공부'·'8:30–9:30 루틴'에서 빠진다. */
 
 const STUDY_BLOCKS = [
-  { id: 'pm', time: '저녁 7:10–8:40', s: '19:10', e: '20:40', min: 90, main: true },
-  { id: 'a', time: '아침 7:00–8:30', s: '07:00', e: '08:30', min: 90 },
-  { id: 'b', time: '9:30–11:00', s: '09:30', e: '11:00', min: 90 },
+  { id: 'a', name: '1차 공부', time: '7:00–8:30', s: '19:00', e: '20:30', min: 90 },
+  { id: 'b', name: '2차 공부', time: '9:30–11:00', s: '21:30', e: '23:00', min: 90 },
 ];
-const PM_BLOCK = STUDY_BLOCKS[0];
 const ROWS_MIN = 4; // 처음 보이는 줄 수
 const ROWS_MAX = 8; // 다 쓰면 한 줄씩 늘어나는 끝
 const EXAM_DAYS = 120; // 공부 탭 위에 D-day로 보여 줄 공적 일정 범위
@@ -52,14 +49,17 @@ const rowMin = (r) => {
 const rowBad = (r) => !!(r.s && r.e && r.s !== r.e && !rowMin(r));
 const hm = (t) => t.replace(/^0(?=\d)/, ''); // 07:00 → 7:00
 
-/* 평일 계획 칸과 겹친 시간 (분). 절반 이상 겹치면 그 칸을 지킨 것으로 본다 */
-const blockMin = (rows, b) => rows.reduce((a, r) => (rowMin(r)
-  ? a + Math.max(0, Math.min(toMin(r.e), toMin(b.e)) - Math.max(toMin(r.s), toMin(b.s))) : a), 0);
+/* 출근일 1차·2차 공부 시간과 겹친 시간 (분). 절반 이상 겹치면 지킨 것으로 본다 (리포트) */
+const blockMin = (rows, b) => rows.reduce((a, r) => {
+  const n = rowMin(r);
+  const s0 = toMin(r.s); // 자정을 넘긴 줄도 시작 + 길이로 본다
+  return n ? a + Math.max(0, Math.min(s0 + n, toMin(b.e)) - Math.max(s0, toMin(b.s))) : a;
+}, 0);
 const blockDone = (rec, b) => !!rec && (!!rec[b.id] || blockMin(rec.rows || [], b) >= b.min / 2);
 
 /* 기록 한 날을 글로 (리포트용). 예전 평일 기록(a·b)도 읽는다 */
 const studyParts = (rec) => [
-  ...STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => `${b.time.split('–')[0]} ${rec[b.id]}`),
+  ...STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => `${b.name} ${rec[b.id]}`),
   ...(rec.rows || []).map((r) => `${r.s && r.e ? `${hm(r.s)}–${hm(r.e)} ` : r.s ? `${hm(r.s)}– ` : ''}${r.t}`.trim()),
 ];
 
@@ -85,7 +85,7 @@ function stRecDate() {
 }
 const stSnap = () => studySnapshot(stOf(), dayMode(stRecDate()));
 
-/* 남겨 둔 기록 → 칸 (지난 날 기록을 불러와 고칠 때). 예전 평일 기록의 a·b는 계획 시간 줄로 */
+/* 남겨 둔 기록 → 칸 (지난 날 기록을 불러와 고칠 때). 예전 평일 기록의 a·b는 1차·2차 시간 줄로 */
 function recordToStudy(rec) {
   const old = STUDY_BLOCKS.filter((b) => rec[b.id]).map((b) => ({ s: b.s, e: b.e, t: rec[b.id] }));
   return { review: rec.review || 0, rows: [...old, ...(rec.rows || []).map((r) => ({ ...r }))] };
@@ -98,9 +98,6 @@ function stShown(s) {
   return stRows(s, Math.min(ROWS_MAX, Math.max(ROWS_MIN, last + 2)));
 }
 const rowHtml = (r, i, ro) => timeRowHtml(r, i, ro, i ? '공부한 내용' : '공부한 내용 (예: 기출 10문제, 틀린 것 2)');
-const planChip = (rows, b) => `<button class="st-chip" data-plan="${b.id}" aria-pressed="${blockMin(rows, b) >= b.min / 2}">${b.time}</button>`;
-const planHtml = (rows) => `<div class="st-plan"><span>계획</span>${planChip(rows, PM_BLOCK)}</div>
-  <div class="st-plan st-plan-opt"><span>되는 날만</span>${STUDY_BLOCKS.filter((b) => !b.main).map((b) => planChip(rows, b)).join('')}</div>`;
 
 function renderStudy() {
   const s = stOf();
@@ -144,7 +141,6 @@ function renderStudy() {
     <section class="wo-card">
       <div class="wo-head"><span class="wo-name">${mode === 'weekday' ? '출근일 공부' : '쉬는 날 공부'}</span><span class="wo-target">시간 고르고 내용 적기</span>
         <span class="wo-amt" id="st-total">${fmtMin(rows.reduce((a, r) => a + rowMin(r), 0))}</span></div>
-      ${mode === 'weekday' ? planHtml(rows) : ''}
       <div id="st-rows">${rows.map((r, i) => rowHtml(r, i, ro)).join('')}</div>
     </section>`;
 
@@ -173,24 +169,10 @@ $('st-body').addEventListener('click', (e) => {
   if (e.target.closest('#st-review')) {
     editStudy({ review: stOf().review ? 0 : 1 });
     renderStudy();
-    return;
   }
-  // 계획 버튼: 계획대로 했으면 눌러서 빈 줄에 그 시간을 채운다
-  const chip = e.target.closest('[data-plan]');
-  if (!chip) return;
-  const b = STUDY_BLOCKS.find((x) => x.id === chip.dataset.plan);
-  const rows = stRows(stOf(), document.querySelectorAll('#st-rows .st-row').length);
-  if (chip.getAttribute('aria-pressed') === 'true') { toast(`${b.time} 시간은 이미 적었어요`); return; }
-  const i = rows.findIndex((r) => !r.s && !r.e);
-  if (i < 0) { toast('빈 줄이 없어요'); return; }
-  rows[i] = { ...rows[i], s: b.s, e: b.e };
-  editStudy({ rows });
-  renderStudy();
-  const t = document.querySelector(`#st-rows .st-row[data-i="${i}"] .st-row-text`);
-  if (t && !t.value) t.focus();
 });
 
-// 글자를 칠 때마다 저장 (다시 그리지 않아 입력이 끊기지 않게: 합계·계획 표시·새 줄만 고친다)
+// 글자를 칠 때마다 저장 (다시 그리지 않아 입력이 끊기지 않게: 합계·시간 확인·새 줄만 고친다)
 $('st-body').addEventListener('input', (e) => {
   const f = e.target.dataset.f;
   const row = e.target.closest('.st-row');
@@ -203,10 +185,6 @@ $('st-body').addEventListener('input', (e) => {
   editStudy({ rows }, true);
   row.classList.toggle('bad', rowBad(rows[i]));
   $('st-total').textContent = fmtMin(rows.reduce((a, r) => a + rowMin(r), 0));
-  for (const c of document.querySelectorAll('#st-body [data-plan]')) {
-    const b = STUDY_BLOCKS.find((x) => x.id === c.dataset.plan);
-    c.setAttribute('aria-pressed', String(blockMin(rows, b) >= b.min / 2));
-  }
   // 마지막 줄을 쓰기 시작하면 빈 줄을 하나 더
   if (i === n - 1 && n < ROWS_MAX && (rows[i].s || rows[i].e || rows[i].t)) box.insertAdjacentHTML('beforeend', rowHtml({ s: '', e: '', t: '' }, n, ''));
 });

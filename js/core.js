@@ -45,9 +45,9 @@ function normalize(s) {
   s.workout = obj(s.workout) && obj(s.workout.c) ? s.workout : { date: null, c: {} };
   s.studies = obj(s.studies) ? s.studies : {};
   s.study = obj(s.study) ? s.study : { date: null };
-  // 예전 평일 칸(a = 7:00–8:30, b = 9:30–11:00)에 적어 둔 내용은 시간 줄로 옮긴다
+  // 예전 평일 칸(a = 1차 저녁 7:00–8:30, b = 2차 9:30–11:00)에 적어 둔 내용은 시간 줄로 옮긴다
   if ('a' in s.study || 'b' in s.study) {
-    const old = [['a', '07:00', '08:30'], ['b', '09:30', '11:00']]
+    const old = [['a', '19:00', '20:30'], ['b', '21:30', '23:00']]
       .filter(([f]) => typeof s.study[f] === 'string' && s.study[f].trim())
       .map(([f, from, to]) => ({ s: from, e: to, t: s.study[f].trim() }));
     const rows = Array.isArray(s.study.rows) ? s.study.rows.filter((r) => r && (r.s || r.e || r.t)) : [];

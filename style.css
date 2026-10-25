@@ -1017,19 +1017,6 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .st-exam { padding: 4px 10px; border-radius: 999px; background: var(--c-work-soft); font-size: 13px; color: var(--text); }
 .st-exam b { font-variant-numeric: tabular-nums; margin-right: 2px; }
 .st-review { margin-bottom: 10px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); }
-.st-plan { display: flex; align-items: center; gap: 6px; margin: -2px 0 12px; font-size: 13px; color: var(--text-2); }
-.st-plan > span { margin-right: 2px; }
-.st-chip {
-  padding: 5px 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-.st-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.st-chip[aria-pressed="true"]::before { content: '✓ '; }
 .st-row { display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: center; gap: 4px 4px; }
 .st-row + .st-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .st-row-text { grid-column: 1 / -1; }
@@ -1046,6 +1033,10 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 }
 .st-row-text { display: block; height: auto; min-height: 40px; padding: 8px 10px; line-height: 1.35; resize: none; overflow: hidden; }
 .st-tilde { text-align: center; color: var(--text-3); }
+/* 끝이 시작보다 한참 이른 줄 (시간 오타) */
+.st-warn { display: none; grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--danger); }
+.st-row.bad .st-warn { display: block; }
+.st-row.bad .st-time { border-color: var(--danger); }
 .app[data-view="study"] .toast { bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 76px); }
 .r-week { margin-top: 6px; border-radius: 10px; background: var(--bg); }
 .r-week summary { padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
@@ -1087,7 +1078,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .stale-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
 .stale-acts .wo-btn { height: 40px; font-size: 13px; }
 .stale-acts .wo-btn.primary { grid-column: 1 / -1; }
-.locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-chip, .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }
+.locked .wo-cell, .locked .rt-item, .locked [data-w20], .locked .st-time, .locked .st-row-text, .locked #st-mode { opacity: .55; pointer-events: none; }
 
 /* ───────── 내 건강 카드 ───────── */
 .h-ic { background: var(--c-me-soft); color: var(--c-me); }
@@ -1183,12 +1174,12 @@ body { word-break: keep-all; overflow-wrap: break-word; }
 .wo-cell { height: 40px; color: var(--text-2); }
 .icon-btn.small { width: 44px; height: 44px; }
 .seg button { height: 40px; }
-.cp-btn, .st-chip { min-height: 36px; }
+.cp-btn { min-height: 36px; }
 .chips button { min-height: 36px; }
 .h-step { overflow: visible; }
 /* 작은 버튼은 보이는 크기는 그대로, 누르는 영역만 위아래 44px로 */
-.pill, .mini-seg button, .st-chip, .chips button, .h-step button, .cp-btn, .backup-undo { position: relative; }
-.pill::after, .mini-seg button::after, .st-chip::after, .chips button::after, .h-step button::after, .cp-btn::after {
+.pill, .mini-seg button, .chips button, .h-step button, .cp-btn, .backup-undo { position: relative; }
+.pill::after, .mini-seg button::after, .chips button::after, .h-step button::after, .cp-btn::after {
   content: '';
   position: absolute;
   left: 0;

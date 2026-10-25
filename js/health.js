@@ -45,11 +45,12 @@ const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-
 const hItem = (id) => H_ITEMS.find((it) => it.id === id);
 const hGoal = () => ({ ...H_GOAL, ...state.hgoal });
 const hOn = (id, d) => !!(state.health[d] && state.health[d][id]);
-/* 보고 있는 날 k에서 그 항목이 기록되는 날 (늦게 잔 날은 전날 밤) */
-/* 밤 10시 ~ 새벽 4시(하루가 바뀌기 전)에 오늘 화면을 보면 '늦게 잠'은 오늘 밤 (자기 전에 미리 체크) */
+/* 보고 있는 날 k에서 그 항목이 기록되는 날. '늦게 잠'은 잔 날 밤의 날짜로 남긴다:
+ *   오늘 화면 — 낮에는 어젯밤, 밤 10시 ~ 새벽 4시(하루가 바뀌기 전)에는 오늘 밤 (자기 전에 미리 체크)
+ *   지난 날 화면 — 그날 밤 (밤 10시가 넘어 '어젯밤'을 놓쳤으면 어제 화면에서 체크) */
 const lateTonight = () => { const h = new Date().getHours(); return h >= 22 || h < DAY_START_HOUR; };
-const hDay = (it, k) => (it.night ? (k === today && lateTonight() ? k : addDays(k, -1)) : k);
-const nightWord = (k) => (k === today && lateTonight() ? '오늘 밤' : '어젯밤');
+const hDay = (it, k) => (!it.night ? k : k < today || (k === today && lateTonight()) ? k : addDays(k, -1));
+const nightWord = (k) => (k < today ? '그날 밤' : k === today && lateTonight() ? '오늘 밤' : '어젯밤');
 const weekStart = (k) => addDays(k, -parse(k).getDay()); // 일요일
 const addMonths = (k, n) => {
   const d = parse(k);
@@ -219,7 +220,7 @@ function healthBody(k, lf, gap) {
       <div>늦게 잔 날 주 ${stepper('late', '회 이하')}</div>
       <div>주의 음식 ${stepper('food', '일에 한 번')}</div>
     </div>
-    <p class="cond-help">아무것도 안 누른 날은 다 지킨 날이에요. 늦게 잔 날은 다음 날 아침에 '어젯밤'으로 (밤 10시 넘어서는 '오늘 밤'으로) 누르고, 이유는 여러 개 고를 수 있어요. 월간·연간 리포트에 쓰여요.</p>
+    <p class="cond-help">아무것도 안 누른 날은 다 지킨 날이에요. 늦게 잔 날은 다음 날 아침에 '어젯밤'으로 (밤 10시 넘어서는 '오늘 밤'으로) 누르고, 놓쳤으면 지난 날 화면에서 '그날 밤'으로 누르면 돼요. 이유는 여러 개 고를 수 있어요. 월간·연간 리포트에 쓰여요.</p>
   </div>`;
 }
 

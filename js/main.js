@@ -57,7 +57,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     // 입력 중인 시트·칸이 있으면 그다음 기회로 미룬다. 처음 설치할 때는 이전 버전이 없으므로 새로 고치지 않는다.
     const hadController = !!navigator.serviceWorker.controller;
     let updateReady = false;
-    const busy = () => ['sheet', 'lab-sheet', 'choice'].some((id) => !$(id).hidden)
+    const busy = () => ['sheet', 'lab-sheet', 'sh-sheet', 'choice'].some((id) => !$(id).hidden)
       || (document.activeElement && document.activeElement.matches('input, textarea, select'));
     const reloadIfIdle = () => { if (updateReady && document.hidden && !busy()) location.reload(); };
     navigator.serviceWorker.addEventListener('controllerchange', () => {

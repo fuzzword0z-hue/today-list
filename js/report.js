@@ -29,7 +29,8 @@ function hasData({ start, end }) {
   for (const k in state.cond) if (k >= start && k <= end) return true;
   for (const k in state.workouts) if (k >= start && k <= end) return true;
   for (const k in state.studies) if (k >= start && k <= end) return true;
-  for (const o of [state.health, state.weights, state.labs, state.diary]) for (const k in o) if (k >= start && k <= end) return true;
+  for (const o of [state.health, state.weights, state.labs, state.diary, state.mind, state.sns]) for (const k in o) if (k >= start && k <= end) return true;
+  for (const ym in state.money) if (ym >= start.slice(0, 7) && ym <= end.slice(0, 7)) return true;
   const inRange = (o) => o && Object.keys(o).some((k) => k >= start && k <= end);
   return state.events.some((ev) => inRange(ev.done) || inRange(ev.skip));
 }
@@ -255,6 +256,7 @@ function analyze(id) {
   // 감사일기: 쓴 날 · 줄 수 (내용은 리포트에 넣지 않는다 — 피드백은 채팅에서)
   m.dy = { days: 0, lines: 0, span: 0 };
   for (const k in state.diary) if (k >= start && k <= last) { m.dy.days++; m.dy.lines += diaryLines(state.diary[k].t); }
+  m.mind = analyzeMind(start, last); // 일기 탭의 마음 기록 (숫자만)
   const firstDy = Object.keys(state.diary).sort()[0]; // 쓴 날 비율은 처음 쓴 날부터
   if (firstDy && firstDy <= last) m.dy.span = diffDays(last, firstDy > start ? firstDy : start) + 1;
 
@@ -472,6 +474,9 @@ function cheer(m, s, W, prev) {
   if (extra.length) out.push(`${W.this} ${extra.join('과 ')}도 챙겼어요. 내 몸과 목표를 함께 돌보고 있어요.`);
   if (prev && prev.rate !== null && m.rate !== null && m.rate > prev.rate + 0.03) out.push(`무엇보다 ${W.prev}보다 나아졌다는 게 가장 큰 성과예요.`);
   if (m.dy.days >= 3) out.push(`감사일기를 ${m.dy.days}일 썼어요. 작은 감사를 알아보는 눈이 자라고 있어요.`);
+  // 일기 탭의 마음 기록: 나를 믿을 근거 · 욕구에 끌려가지 않은 순간
+  if (m.mind.own >= 10) out.push(`내 기준으로 나를 인정한 게 ${m.mind.own}개예요. 나를 믿을 근거가 쌓이고 있어요.`);
+  if ((m.mind.act.pass || 0) >= 2) out.push(`흔들린 순간에 그냥 느끼고 지나간 게 ${m.mind.act.pass}번이에요. 욕구가 있어도 행동은 내가 정하고 있어요.`);
   // 고양이가 여러 날 토한 달: 다른 기록이 줄어든 걸 탓하지 않는다
   if (m.cond.vomitDays >= 2) out.push(`고양이가 ${m.cond.vomitDays}일 토해서 마음 졸인 날${m.cond.vomitDays >= 4 ? '이 많았어요' : '들이 있었어요'}. 그런 날 다른 기록이 줄어든 건 당연한 일이에요.`);
   // 아픈 고양이를 지켜보느라 늦게 잔 밤: 탓하지 않고 다독인다
@@ -492,7 +497,8 @@ function renderReport(id) {
   const fmtRange = `${md(m.start)} – ${md(m.end)}${m.from > m.start && m.from <= m.last ? ` · ${md(m.from)}부터 쓰기 시작` : ''}${m.end >= today ? ' · 진행 중 (어제까지 반영)' : ''}`;
 
   const [hlSec, hlLines] = healthSection(m.hl, m.yearly);
-  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec && !m.dy.days)) {
+  const [mdSec, mdLines] = mindSection(m.mind, m.yearly);
+  if (m.last < m.start || (!m.total && !m.careSched && !m.cond.days && !m.wo.days && !m.wo.sq.days && !m.st.days && !hlSec && !m.dy.days && !mdSec)) {
     el.innerHTML = `<p class="r-period">${fmtRange}</p><div class="r-empty">아직 분석할 기록이 부족해요.<br>할 일과 케어 기록이 쌓이면 리포트가 채워져요.</div>`;
     lastReportText = '';
     return;
@@ -657,6 +663,7 @@ function renderReport(id) {
     ${stSec}
     ${woSec}
     ${hlSec}
+    ${mdSec}
     <section class="r-sec good"><h2>잘하고 있는 점</h2><ul>${li(f.good)}</ul></section>
     <section class="r-sec cheer"><h2>긍정적인 평가</h2><p>${esc(cheerText)}</p></section>
     <section class="r-sec improve"><h2>개선하면 좋을 점</h2><ul>${li(f.improve)}</ul></section>
@@ -674,6 +681,7 @@ function renderReport(id) {
     ...(stLines.length ? ['', '공부', ...stLines] : []),
     ...(woLines.length ? ['', '운동', ...woLines] : []),
     ...(hlLines.length ? ['', '건강', ...hlLines] : []),
+    ...(mdLines.length ? ['', '마음', ...mdLines] : []),
     '',
     '잘하고 있는 점', ...f.good.map((t) => `- ${t}`),
     '',

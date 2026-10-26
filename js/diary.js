@@ -6,7 +6,10 @@
  *      ("내가 나를 인정한다"는 말이 공허하지 않게, 나를 믿을 근거를 실제 기록에서 꺼내 준다)
  *   ② 감사일기 — 한 줄에 하나씩 (20줄 안팎을 기준으로 줄 수를 보여 줌, 그 이상도 저장은 됨)
  *   ③ 마음에 이름 붙이기 — 무거운 마음을 고르면 '아끼는 친구에게 하듯 나에게 한마디' 칸이 열린다
- *   ④ 오늘의 질문 (하루 하나씩 돌아가며) · 혼자만의 시간
+ *   ④ 오늘의 질문 (하루 하나씩 돌아가며)
+ *   나를 채우는 시간 — 혼자 회복(폰 없이 15분 · 독서 · 호흡 · 햇볕 …)과 연결(짧은 대화 · 안부 · 고마움 · 도움 청하기).
+ *      이미 혼자 잘 지내는 사람에게는 '얼마나 자주 혼자'보다 '내가 고른 혼자인지'와 반대쪽인 '기대는 연결'이 연습 거리라서
+ *      (기댈 곳이 있다고 느낄수록 혼자서 더 과감해진다 — 의존의 역설), 돈이 거의 안 드는 일상 위주로 고른다
  *   흔들린 순간 — 인정·애정 욕구가 올라온 순간을 그때그때 (언제 · 마음 · 그때 한 행동 · 아무도 모른다면)
  *   나를 지키는 환경 — 주간 SNS 시간, 월 지출 · 비상금 (몇 개월치인지)
  * 욕구를 없애는 게 아니라 끌려다니지 않는 연습이라, 모두 '알아차린 것'을 쌓는 곳이다:
@@ -14,8 +17,9 @@
  *
  * state.diary = { 'YYYY-MM-DD': { t: 감사일기 글, at } }   글을 다 지우면 그 날은 지운다
  * state.mind  = { 'YYYY-MM-DD': { own: [세 줄], feel: [마음 이름], self: 나에게 한마디, q: { t: 질문, a: 답 }, qi: 다른 질문으로 넘긴 수,
- *                                  alone: ['meal' | 'walk' | 'culture' | 'trip'], sh: [{ at, when, feel: [], act: [], nb, t }] } }
- * state.compass = [문장]   state.compassHide = 접어 둠   state.feelCustom = [직접 더한 마음 이름]
+ *                                  fill: [FILL_REST · FILL_LINK id 또는 직접 더한 이름], sh: [{ at, when, feel: [], act: [], nb, t }] } }
+ *   (예전 '혼자만의 시간' alone은 처음 열 때 fill로 옮긴다 — core.js normalize)
+ * state.compass = [문장]   state.compassHide = 접어 둠   state.feelCustom = [직접 더한 마음 이름]   state.fillCustom = [직접 더한 회복 활동]
  * state.sns   = { 주 시작(일요일) 'YYYY-MM-DD': 하루 평균 분 }   (휴대폰 디지털 웰빙에서 보고 적는다 — 웹앱은 사용 시간을 못 읽는다)
  * state.money = { 'YYYY-MM': { spend: 만원, fund: 만원 } }   비상금 ÷ 최근 3개월 지출 평균 = 몇 개월치 (목표 3–6개월)
  * 이 휴대폰에만 저장되고, 백업 파일(내보내기)에 함께 담긴다. 하루는 다른 탭처럼 새벽 4시에 바뀐다.
@@ -39,8 +43,17 @@ const QUESTIONS = [
   '오늘 나를 아껴 준 순간은?',
   '요즘 호기심이 가는 것은?',
   '오늘 내 행동을 정한 건 나였나요, 남의 반응이었나요?',
+  "오늘 '와' 하고 감탄한 것은?",
+  '오늘 천천히 음미한 순간은?',
+  '이번 달 기다려지는 일은?',
 ];
-const ALONE = [['meal', '혼밥'], ['walk', '혼자 산책'], ['culture', '전시·카페'], ['trip', '혼자 여행']];
+/* 나를 채우는 시간: 혼자 회복 · 연결 (돈 거의 안 드는 일상 위주, 나들이는 도시에 가는 영화 · 연극 · 여행) */
+const FILL_REST = [['nophone', '폰 없이 15분'], ['read', '독서'], ['breath', '호흡·명상'], ['sun', '햇볕·산책'], ['cook', '요리'], ['music', '음악·영화'], ['cat', '고양이와 교감'], ['outing', '나들이']];
+const FILL_LINK = [['talk', '짧은 대화'], ['call', '안부 연락'], ['thanks', '고마움 전함'], ['help', '도움 청함']];
+const FILL_OLD = [['meal', '혼밥']]; // 예전 '혼자만의 시간'에서 옮길 곳이 없던 것 (지난 기록에만 보인다)
+const FILL_CUSTOM_MAX = 8;
+const isLink = (v) => FILL_LINK.some(([x]) => x === v);
+const fillLabel = (v) => pairLabel([...FILL_REST, ...FILL_LINK, ...FILL_OLD], v) || v; // 직접 더한 건 이름 그대로
 /* 흔들린 순간: 언제 · 마음 · 그때 한 행동 · 아무도 모른다 해도 그렇게 했을까 */
 const SH_WHEN = [['got', '인정받았을 때'], ['not', '못 받았을 때'], ['wait', '답을 기다릴 때'], ['compare', '비교될 때'], ['etc', '그 밖에']];
 const SH_FEEL = ['서운함', '불안', '외로움', '부끄러움', '질투', '들뜸', '안도', '뿌듯함'];
@@ -56,11 +69,12 @@ const mindOf = (k) => state.mind[k] || {};
 const ownOf = (m) => arr(m.own).filter((t) => typeof t === 'string' && t.trim());
 const shOf = (m) => arr(m.sh).filter((x) => x && typeof x === 'object');
 /* 그 날 마음 기록에 내용이 있는지 (질문을 넘긴 표시 qi만 있는 건 빼고) */
-const mindHas = (m) => !!(m && (ownOf(m).length || arr(m.feel).length || m.self || (m.q && m.q.a) || arr(m.alone).length || shOf(m).length));
+const mindHas = (m) => !!(m && (ownOf(m).length || arr(m.feel).length || m.self || (m.q && m.q.a) || arr(m.fill).length || shOf(m).length));
 const dayHas = (k) => !!diaryOf(k) || mindHas(state.mind[k]);
 const pairLabel = (list, v) => (list.find(([x]) => x === v) || [])[1] || '';
 const hhmm = (ms) => { const d = new Date(ms); return `${d.getHours()}:${pad(d.getMinutes())}`; };
-let feelAdding = false; // '+ 직접' 입력 칸을 연 상태
+let feelAdding = false; // 마음 이름 '+ 직접' 입력 칸을 연 상태
+let fillAdding = false; // 회복 활동 '+ 직접' 입력 칸을 연 상태
 let compassEdit = false;
 
 /* 마음 기록 고치기: 빈 값은 지우고, 내용이 없으면 그 날을 지운다 (질문을 넘긴 표시는 남김) */
@@ -100,6 +114,7 @@ function renderDiary() {
   updateDiaryCount();
   renderFeel();
   renderQuestion();
+  renderFill();
   renderShakes();
   renderDiaryMonth();
   renderEnv();
@@ -274,27 +289,21 @@ $('dy-feel').addEventListener('input', (e) => {
   if (had !== dayHas(k)) renderDiaryMonth();
 });
 
-/* ───────── ④ 오늘의 질문 · 혼자만의 시간 ───────── */
+/* ───────── ④ 오늘의 질문 ───────── */
 const qIndex = (k) => {
   const n = diffDays(k, '2026-01-01') + (mindOf(k).qi || 0);
   return ((n % QUESTIONS.length) + QUESTIONS.length) % QUESTIONS.length;
 };
 const questionOf = (k) => { const q = mindOf(k).q; return q && q.t ? q.t : QUESTIONS[qIndex(k)]; };
-/* k가 들어 있는 주(일–토)의 혼자만의 시간 횟수 */
-const aloneWeek = (k) => { let n = 0; for (let i = 0, ws = weekStart(k); i < 7; i++) n += arr(mindOf(addDays(ws, i)).alone).length; return n; };
 
 function renderQuestion() {
   const k = ui.diaryDate;
   const m = mindOf(k);
   const answered = !!(m.q && m.q.a);
-  const al = arr(m.alone);
-  const wk = aloneWeek(k);
   $('dy-q').innerHTML = `<div class="wo-head"><span class="wo-name">오늘의 질문</span><span class="wo-target">안 써도 괜찮아요</span>
       ${answered ? '' : '<button type="button" class="dy-cp-btn" data-q-next>다른 질문</button>'}</div>
     <p class="dy-question">${esc(questionOf(k))}</p>
-    <textarea class="dy-in" id="dy-qa" rows="1" maxlength="500" aria-label="오늘의 질문에 답하기" placeholder="떠오르는 대로 한두 줄">${esc(answered ? m.q.a : '')}</textarea>
-    <div class="dy-alone"><span>혼자만의 시간</span><div class="chips dy-chips" role="group" aria-label="혼자만의 시간">${ALONE.map(([v, l]) => `<button type="button" data-alone="${v}" aria-pressed="${al.includes(v)}">${l}</button>`).join('')}</div>
-      <small>${wk ? `${k >= weekStart(today) ? '이번 주' : '그 주'} ${wk}번` : '처음엔 불편해도 그게 연습이에요'}</small></div>`;
+    <textarea class="dy-in" id="dy-qa" rows="1" maxlength="500" aria-label="오늘의 질문에 답하기" placeholder="떠오르는 대로 한두 줄">${esc(answered ? m.q.a : '')}</textarea>`;
   growText($('dy-qa'));
 }
 $('dy-q').addEventListener('click', (e) => {
@@ -302,15 +311,7 @@ $('dy-q').addEventListener('click', (e) => {
   if (e.target.closest('[data-q-next]')) {
     setMind(k, { qi: (mindOf(k).qi || 0) + 1 });
     renderQuestion();
-    return;
   }
-  const b = e.target.closest('[data-alone]');
-  if (!b) return;
-  const v = b.dataset.alone;
-  const al = arr(mindOf(k).alone);
-  setMind(k, { alone: al.includes(v) ? al.filter((x) => x !== v) : [...al, v] });
-  renderQuestion();
-  renderDiaryMonth();
 });
 $('dy-q').addEventListener('input', (e) => {
   if (e.target.id !== 'dy-qa') return;
@@ -323,6 +324,68 @@ $('dy-q').addEventListener('input', (e) => {
   const nx = $('dy-q').querySelector('[data-q-next]');
   if (nx) nx.hidden = !!a.trim();
   if (had !== dayHas(k)) renderDiaryMonth();
+});
+
+/* ───────── 나를 채우는 시간: 혼자 회복 · 연결 ───────── */
+/* k가 들어 있는 주(일–토)의 회복 · 연결 횟수 */
+function fillWeek(k) {
+  let rest = 0, link = 0;
+  for (let i = 0, ws = weekStart(k); i < 7; i++) for (const v of arr(mindOf(addDays(ws, i)).fill)) if (isLink(v)) link++; else rest++;
+  return { rest, link };
+}
+
+function renderFill() {
+  const k = ui.diaryDate;
+  const sel = arr(mindOf(k).fill);
+  // 기본 + 직접 더한 것 + 그 날 고른 예전 항목(혼밥 등)
+  const rest = [...FILL_REST, ...state.fillCustom.map((t) => [t, t]),
+    ...sel.filter((v) => !isLink(v) && !FILL_REST.some(([x]) => x === v) && !state.fillCustom.includes(v)).map((v) => [v, fillLabel(v)])];
+  const chip = ([v, l]) => `<button type="button" data-fill="${esc(v)}" aria-pressed="${sel.includes(v)}">${esc(l)}</button>`;
+  const wk = fillWeek(k);
+  const when = k >= weekStart(today) ? '이번 주' : '그 주';
+  const hint = wk.rest + wk.link === 0 ? '돈이 들지 않아도, 내가 고른 시간이면 충분해요.'
+    : wk.rest >= 3 && !wk.link ? `${when} 회복 ${wk.rest}번. 혼자 잘 지내는 사람일수록 기대는 연습이 도움이 돼요 — 짧은 대화 하나도 충분해요.`
+      : `${when} 회복 ${wk.rest}번 · 연결 ${wk.link}번. 혼자 보낸 뒤 기운이 차면 쉼, 가라앉으면 연결 쪽을 하나 더 해 보세요.`;
+  $('dy-fill').innerHTML = `<div class="wo-head"><span class="wo-name">나를 채우는 시간</span><span class="wo-target">혼자 회복하고, 기대고 주기</span></div>
+    <div class="dy-fill-row"><span>혼자 회복</span><div class="chips dy-chips" role="group" aria-label="혼자 회복">${rest.map(chip).join('')}
+      ${fillAdding ? '' : '<button type="button" class="dy-add-chip" data-fill-add>+ 직접</button>'}</div></div>
+    ${fillAdding ? `<div class="dy-line"><input class="dy-in" id="dy-fill-new" type="text" maxlength="12" enterkeyhint="done" placeholder="예: 그림 그리기" aria-label="새 회복 활동">
+      <button type="button" class="dy-cp-btn strong" data-fill-ok>더하기</button></div>` : ''}
+    <div class="dy-fill-row"><span>연결</span><div class="chips dy-chips" role="group" aria-label="연결">${FILL_LINK.map(chip).join('')}</div></div>
+    <p class="dy-hint">${hint}</p>`;
+}
+function addCustomFill() {
+  const inp = $('dy-fill-new');
+  const t = inp ? inp.value.trim() : '';
+  fillAdding = false;
+  if (t) {
+    const k = ui.diaryDate;
+    const known = [...FILL_REST, ...FILL_LINK].find(([, l]) => l === t);
+    const v = known ? known[0] : t;
+    if (!known && !state.fillCustom.includes(t)) {
+      if (state.fillCustom.length >= FILL_CUSTOM_MAX) state.fillCustom.shift(); // 가장 오래된 것부터 빠진다
+      state.fillCustom.push(t);
+    }
+    const sel = arr(mindOf(k).fill);
+    setMind(k, { fill: sel.includes(v) ? sel : [...sel, v] });
+  }
+  renderFill();
+  renderDiaryMonth();
+}
+$('dy-fill').addEventListener('click', (e) => {
+  const k = ui.diaryDate;
+  if (e.target.closest('[data-fill-add]')) { fillAdding = true; renderFill(); $('dy-fill-new').focus(); return; }
+  if (e.target.closest('[data-fill-ok]')) { addCustomFill(); return; }
+  const b = e.target.closest('[data-fill]');
+  if (!b) return;
+  const v = b.dataset.fill;
+  const sel = arr(mindOf(k).fill);
+  setMind(k, { fill: sel.includes(v) ? sel.filter((x) => x !== v) : [...sel, v] });
+  renderFill();
+  renderDiaryMonth();
+});
+$('dy-fill').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'dy-fill-new') { e.preventDefault(); addCustomFill(); }
 });
 
 /* ───────── 흔들린 순간 ───────── */
@@ -452,7 +515,12 @@ function dayParts(x) {
   if (arr(m.feel).length) out.push(['마음', arr(m.feel).join(', ')]);
   if (m.self) out.push(['나에게', m.self.trim()]);
   if (m.q && m.q.a) out.push(['질문', `${m.q.t} → ${m.q.a.trim()}`]);
-  if (arr(m.alone).length) out.push(['혼자만의 시간', arr(m.alone).map((a) => pairLabel(ALONE, a)).join(', ')]);
+  const fill = arr(m.fill);
+  if (fill.length) {
+    const part = (list) => list.map(fillLabel).join(', ');
+    const rest = fill.filter((v) => !isLink(v)), link = fill.filter(isLink);
+    out.push(['나를 채우는 시간', [rest.length ? `회복: ${part(rest)}` : '', link.length ? `연결: ${part(link)}` : ''].filter(Boolean).join(' / ')]);
+  }
   if (shOf(m).length) out.push(['흔들린 순간', shOf(m).map((s) => `- ${shLine(s)}${s.t ? ` · ${s.t}` : ''}`).join('\n')]);
   return out;
 }
@@ -477,6 +545,7 @@ function goDiary(k) {
   if (k > today) return;
   flushSave();
   feelAdding = false;
+  fillAdding = false;
   ui.diaryDate = k;
   renderDiary();
 }
@@ -577,7 +646,7 @@ function envLines(k) {
 
 /* ═════════ 리포트: '마음' 칸 (숫자만, 점수에는 넣지 않음) ═════════ */
 function analyzeMind(start, last) {
-  const r = { days: 0, own: 0, ownDays: 0, feel: {}, self: 0, q: 0, alone: 0, sh: 0, when: {}, act: {}, nb: {}, shAfterLate: 0, shLateKnown: 0, sns: [], fund: null };
+  const r = { days: 0, own: 0, ownDays: 0, feel: {}, self: 0, q: 0, rest: {}, link: {}, restN: 0, linkN: 0, sh: 0, when: {}, act: {}, nb: {}, shAfterLate: 0, shLateKnown: 0, sns: [], fund: null };
   const bump = (o, x) => { o[x] = (o[x] || 0) + 1; };
   for (const k in state.mind) {
     if (k < start || k > last) continue;
@@ -589,7 +658,9 @@ function analyzeMind(start, last) {
     for (const f of arr(m.feel)) bump(r.feel, f);
     if (m.self) r.self++;
     if (m.q && m.q.a) r.q++;
-    r.alone += arr(m.alone).length;
+    for (const v of arr(m.fill)) {
+      if (isLink(v)) { r.linkN++; bump(r.link, v); } else { r.restN++; bump(r.rest, v); }
+    }
     for (const s of shOf(m)) {
       r.sh++;
       if (s.when) bump(r.when, s.when);
@@ -611,7 +682,7 @@ function mindSection(mi, yearly) {
   const tiles = [];
   if (mi.own) tiles.push(['인정한 것', `${mi.own}<small>개</small>`, `<small>${mi.ownDays}일</small>`]);
   if (mi.sh) tiles.push(['흔들린 순간', `${mi.sh}<small>번</small>`, mi.act.pass ? `<small>그냥 느끼고 지나감 ${mi.act.pass}</small>` : '']);
-  if (mi.alone) tiles.push(['혼자만의 시간', `${mi.alone}<small>번</small>`, '']);
+  if (mi.restN + mi.linkN) tiles.push(['나를 채우는 시간', `${mi.restN + mi.linkN}<small>번</small>`, `<small>회복 ${mi.restN} · 연결 ${mi.linkN}</small>`]);
   if (mi.q) tiles.push(['오늘의 질문', `${mi.q}<small>번 답함</small>`, '']);
   if (mi.sns.length) {
     const a = mi.sns[0][1], b = mi.sns[mi.sns.length - 1][1];
@@ -623,6 +694,9 @@ function mindSection(mi, yearly) {
   if (Object.keys(mi.when).length) dists.push(['흔들린 때', topText(mi.when, (x) => pairLabel(SH_WHEN, x))]);
   if (Object.keys(mi.act).length) dists.push(['그때 한 행동', topText(mi.act, (x) => pairLabel(SH_ACT, x), 6)]);
   if (Object.keys(mi.nb).length) dists.push(['아무도 모른다 해도', topText(mi.nb, (x) => pairLabel(SH_NB, x))]);
+  if (mi.restN) dists.push(['혼자 회복', topText(mi.rest, fillLabel)]);
+  if (mi.linkN) dists.push(['연결', topText(mi.link, fillLabel)]);
+  else if (mi.restN >= 6) dists.push(['연결', '이번 기간엔 기록이 없어요. 혼자 잘 지내는 사람일수록 기대는 연습이 도움이 돼요 — 짧은 대화 하나도 충분해요.']);
   if (mi.shLateKnown >= 3 && mi.shAfterLate * 2 >= mi.shLateKnown) {
     dists.push(['몸의 리듬', `흔들린 순간 ${mi.shLateKnown}번 중 ${mi.shAfterLate}번이 늦게 잔 다음 날이었어요. 지친 몸은 마음을 더 크게 흔들어요.`]);
   }

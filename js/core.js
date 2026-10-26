@@ -20,7 +20,7 @@
  *   offDays: [요일]   매주 쉬는 요일 (0 = 일요일, 처음엔 [1] 월요일)
  *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
  *   diary: { 'YYYY-MM-DD': { t, at } }   감사일기 (js/diary.js)
- *   mind, compass, compassHide, feelCustom, sns, money  일기 탭의 나머지: 인정한 3가지 · 마음 이름 · 질문 · 혼자만의 시간 ·
+ *   mind, compass, compassHide, feelCustom, fillCustom, sns, money  일기 탭의 나머지: 인정한 3가지 · 마음 이름 · 질문 · 나를 채우는 시간 ·
  *                                     흔들린 순간, 나침반 문장, 주간 SNS 시간, 월 지출·비상금 (js/diary.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
@@ -78,9 +78,18 @@ function normalize(s) {
   s.labs = obj(s.labs) ? s.labs : {};
   s.diary = obj(s.diary) ? s.diary : {};
   s.mind = obj(s.mind) ? s.mind : {};
+  // 예전 '혼자만의 시간'(alone) → '나를 채우는 시간'(fill): 혼자 산책 → 햇볕·산책, 전시·카페 · 혼자 여행 → 나들이 (혼밥은 그대로)
+  const ALONE_TO_FILL = { walk: 'sun', culture: 'outing', trip: 'outing' };
+  for (const d in s.mind) {
+    const m = s.mind[d];
+    if (!m || typeof m !== 'object' || !Array.isArray(m.alone)) continue;
+    m.fill = [...new Set([...(Array.isArray(m.fill) ? m.fill : []), ...m.alone.map((a) => ALONE_TO_FILL[a] || a)])];
+    delete m.alone;
+  }
   s.compass = Array.isArray(s.compass) ? s.compass.filter((t) => typeof t === 'string' && t.trim()).slice(0, 5) : COMPASS_DEFAULT.slice();
   s.compassHide = !!s.compassHide;
   s.feelCustom = Array.isArray(s.feelCustom) ? s.feelCustom.filter((t) => typeof t === 'string' && t.trim()).slice(0, 12) : [];
+  s.fillCustom = Array.isArray(s.fillCustom) ? s.fillCustom.filter((t) => typeof t === 'string' && t.trim()).slice(0, 8) : [];
   s.sns = obj(s.sns) ? s.sns : {};
   s.money = obj(s.money) ? s.money : {};
   if (s.dismissed === undefined) s.dismissed = null;

@@ -477,6 +477,7 @@ function cheer(m, s, W, prev) {
   // 일기 탭의 마음 기록: 나를 믿을 근거 · 욕구에 끌려가지 않은 순간
   if (m.mind.own >= 10) out.push(`내 기준으로 나를 인정한 게 ${m.mind.own}개예요. 나를 믿을 근거가 쌓이고 있어요.`);
   if ((m.mind.act.pass || 0) >= 2) out.push(`흔들린 순간에 그냥 느끼고 지나간 게 ${m.mind.act.pass}번이에요. 욕구가 있어도 행동은 내가 정하고 있어요.`);
+  if (m.mind.linkN >= 4) out.push(`기대고 주는 연결을 ${m.mind.linkN}번 했어요. 기댈 곳이 있다는 느낌이 혼자서도 더 과감하게 해 줘요.`);
   // 고양이가 여러 날 토한 달: 다른 기록이 줄어든 걸 탓하지 않는다
   if (m.cond.vomitDays >= 2) out.push(`고양이가 ${m.cond.vomitDays}일 토해서 마음 졸인 날${m.cond.vomitDays >= 4 ? '이 많았어요' : '들이 있었어요'}. 그런 날 다른 기록이 줄어든 건 당연한 일이에요.`);
   // 아픈 고양이를 지켜보느라 늦게 잔 밤: 탓하지 않고 다독인다

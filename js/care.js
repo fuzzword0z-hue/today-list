@@ -1,22 +1,49 @@
 'use strict';
 
 /* ═════════════════ 고양이 케어: 컨디션 기록 · 체크 누락 확인 · 진료 전 요약 ═════════════════
- * state.cond = { 'YYYY-MM-DD': { ap, en, vo, st, w, n, th } }
- *   ap 식욕 · en 활력 · vo 구토 · st 배변 (아래 COND의 값) · w 체중(kg) · n 메모 · th 치아 이 닦임(1) */
+ * state.cond = { 'YYYY-MM-DD': { ap, en, vo, vl, st, w, n, th } }
+ *   ap 식욕 · en 활력 · st 배변 (아래 COND의 값) · w 체중(kg) · n 메모 · th 치아 이 닦임(1)
+ *   구토는 한 번에 한 줄: vl = [{ t: 종류(VOMIT), at: 'HH:MM', b: 1 피 섞임, n: 메모 }]
+ *     오늘 누르면 지금 시각으로 1회가 더해지고, 줄을 눌러 종류 · 시각 · 피 섞임 · 메모를 고친다 (지난 날은 시각 없이도 됨).
+ *     하루에 거품 1 · 사료 1 · 위액 1처럼 섞여도, 같은 종류를 여러 번 해도 그대로 남고, 언제 토했는지가 진료에 단서가 된다.
+ *   vo = '0' 오늘 안 토함 (확인했다는 기록). 예전 기록의 '1' · '2'(2회 이상)는 그대로 읽고, 그 날 새로 적으면 바뀐다. */
 
 const COND = [
   { f: 'ap', label: '식욕', opts: [['good', '잘 먹음'], ['normal', '보통'], ['low', '적게'], ['none', '안 먹음']], bad: ['low', 'none'] },
   { f: 'en', label: '활력', opts: [['good', '좋음'], ['normal', '보통'], ['low', '처짐']], bad: ['low'] },
-  { f: 'vo', label: '구토', opts: [['0', '없음'], ['1', '1회'], ['2', '2회 이상']], bad: ['1', '2'] },
   { f: 'st', label: '배변', opts: [['normal', '정상'], ['loose', '묽음·설사'], ['hard', '변비']], bad: ['loose', 'hard'] },
 ];
+const VOMIT = [['foam', '거품'], ['food', '사료'], ['bile', '위액'], ['hair', '헤어볼'], ['med', '약 직후'], ['etc', '기타']];
 const PAW_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="16" rx="4.6" ry="3.6"/><circle cx="6" cy="10.5" r="1.8"/><circle cx="9.6" cy="6.6" r="1.8"/><circle cx="14.4" cy="6.6" r="1.8"/><circle cx="18" cy="10.5" r="1.8"/></svg>';
 const PROMPT_DAYS = 3; // 오늘 화면에서 체크가 빠진 케어를 물어보는 기간 (어제부터 며칠 전까지)
 
 const optLabel = (f, v) => { const c = COND.find((x) => x.f === f); const o = c && c.opts.find((x) => x[0] === v); return o ? o[1] : ''; };
 const condOf = (k) => state.cond[k] || null;
 const isBad = (f, v) => COND.find((x) => x.f === f).bad.includes(v);
-const hasSymptom = (c) => !!c && COND.some((x) => c[x.f] && isBad(x.f, c[x.f]));
+
+/* ───────── 구토 ───────── */
+const vomitLabel = (t) => (VOMIT.find(([x]) => x === t) || [])[1] || '기타';
+const vomitList = (c) => (c && Array.isArray(c.vl) ? c.vl.filter((x) => x && typeof x === 'object') : []);
+/* 그 날 구토 횟수: 새 기록은 줄 수, 예전 기록은 1회 · 2회 이상(plus) */
+function vomitCount(c) {
+  const vl = vomitList(c);
+  if (vl.length) return { n: vl.length, plus: false };
+  if (c && (c.vo === '1' || c.vo === '2')) return { n: +c.vo, plus: c.vo === '2' };
+  return { n: 0, plus: false };
+}
+const vomited = (c) => vomitCount(c).n > 0;
+const vomitBlood = (c) => vomitList(c).some((x) => x.b);
+const vomitText = (c) => { const v = vomitCount(c); return v.n ? `구토 ${v.n}회${v.plus ? ' 이상' : ''}${vomitBlood(c) ? ' (피 섞임)' : ''}` : ''; };
+/* 하루가 새벽 4시에 바뀌므로 0–4시는 그 날 밤 끝으로 놓고 정렬 */
+const timeKey = (at) => { if (!at) return 9999; const [h, m] = at.split(':').map(Number); return (h < DAY_START_HOUR ? h + 24 : h) * 60 + m; };
+/* 종류별 횟수 (많은 순): '위액 2 · 사료 1' */
+function vomitTypes(list, n = 6) {
+  const o = {};
+  for (const x of list) o[x.t] = (o[x.t] || 0) + 1;
+  return Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([t, c]) => `${vomitLabel(t)} ${c}`).join(' · ');
+}
+const vomitEntry = (x) => `${x.at ? `${hm(x.at)} ` : ''}${vomitLabel(x.t)}${x.b ? '(피 섞임)' : ''}${x.n ? ` "${x.n}"` : ''}`;
+const hasSymptom = (c) => !!c && (COND.some((x) => c[x.f] && isBad(x.f, c[x.f])) || vomited(c));
 const fmtKg = (w) => `${Math.round(w * 100) / 100}kg`;
 const ml = (k) => `${parse(k).getMonth() + 1}/${parse(k).getDate()}`;
 const agoText = (n) => (n < 7 ? `${n}일 전` : `${Math.floor(n / 7)}주${n % 7 ? ` ${n % 7}일` : ''} 전`);
@@ -24,8 +51,8 @@ const agoText = (n) => (n < 7 ? `${n}일 전` : `${Math.floor(n / 7)}주${n % 7 
 /* 한 줄 요약: 이상 있는 항목 + 체중 */
 function condSummary(c, withTh = true) {
   if (!c) return '';
-  const bad = COND.filter((x) => c[x.f] && isBad(x.f, c[x.f])).map((x) => `${x.label} ${optLabel(x.f, c[x.f])}`);
-  const recorded = COND.some((x) => c[x.f]);
+  const bad = [vomitText(c), ...COND.filter((x) => c[x.f] && isBad(x.f, c[x.f])).map((x) => `${x.label} ${optLabel(x.f, c[x.f])}`)].filter(Boolean);
+  const recorded = COND.some((x) => c[x.f]) || c.vo === '0' || vomited(c);
   const parts = bad.length ? bad : recorded ? ['특이 사항 없음'] : [];
   if (c.w) parts.push(fmtKg(c.w));
   if (c.th && withTh) parts.push('양치 ✓');
@@ -170,6 +197,7 @@ function renderCond() {
       ${COND.map((x) => `<div class="cond-row"><span class="cond-label">${x.label}</span><div class="chips" data-f="${x.f}">
         ${x.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${!!c && c[x.f] === v}" class="${x.bad.includes(v) ? 'bad' : ''}">${l}</button>`).join('')}
       </div></div>`).join('')}
+      ${vomitRow(k, c)}
       <div class="cond-row"><span class="cond-label">체중</span>
         <input class="cond-w" id="cond-w" aria-label="고양이 체중" type="number" inputmode="decimal" step="0.01" min="0" max="30" placeholder="0.00" value="${c && c.w ? c.w : ''}"><span class="cond-unit">kg</span>
         ${lastWeight(k) ? `<span class="cond-prev">지난 ${fmtKg(lastWeight(k).w)} (${ml(lastWeight(k).k)})</span>` : ''}
@@ -178,6 +206,23 @@ function renderCond() {
       <p class="cond-help">고른 항목을 한 번 더 누르면 지워져요. 진료 전 요약과 월간 리포트에 쓰여요.</p>
     </div>` : ''}`;
 }
+
+/* 구토 줄: [+ 종류]를 누르면 1회씩 더해지고, 아래 목록의 줄을 누르면 고친다 */
+function vomitRow(k, c) {
+  const vl = vomitList(c);
+  const order = vl.map((x, i) => ({ x, i })).sort((a, b) => timeKey(a.x.at) - timeKey(b.x.at) || a.i - b.i);
+  const legacy = !vl.length && c && (c.vo === '1' || c.vo === '2');
+  return `<div class="cond-row vo-row"><span class="cond-label">구토</span><div class="chips vo-add" role="group" aria-label="구토 1회 더하기">
+      ${VOMIT.map(([t, l]) => `<button type="button" data-vadd="${t}">+ ${l}</button>`).join('')}
+      ${vl.length ? '' : `<button type="button" data-vnone aria-pressed="${!!c && c.vo === '0'}">${k === today ? '오늘 ' : ''}안 토함</button>`}</div></div>
+    ${vl.length ? `<ul class="vo-list">${order.map(({ x, i }) => `<li><button type="button" data-vi="${i}">
+        <b>${x.at ? hm(x.at) : '–'}</b><span>${vomitLabel(x.t)}</span>${x.b ? '<span class="vo-blood">피 섞임</span>' : ''}${x.n ? `<small>${esc(x.n)}</small>` : ''}</button></li>`).join('')}</ul>
+      <p class="vo-sum">${k === today ? '오늘' : ml(k)} ${vl.length}회 · ${vomitTypes(vl)} · 줄을 누르면 고칠 수 있어요</p>` : ''}
+    ${vl.some((x) => x.b) ? '<p class="vo-note bad">피가 섞였어요. 병원에 꼭 알려 주세요.</p>' : ''}
+    ${vl.some((x) => x.t === 'med') ? '<p class="vo-note">약을 먹자마자 토했다면, 다시 먹일지는 꼭 병원 지시대로 해 주세요.</p>' : ''}
+    ${legacy ? `<p class="vo-legacy">예전 기록: ${c.vo === '2' ? '2회 이상' : '1회'} · 종류를 골라 다시 적으면 이 기록은 바뀌어요</p>` : ''}`;
+}
+const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
 function lastWeight(before) {
   const ks = Object.keys(state.cond).filter((k) => k < before && state.cond[k].w).sort();
@@ -211,6 +256,29 @@ $('cond').addEventListener('click', (e) => {
     updateCondHead();
     return;
   }
+  // 구토 1회 더하기 (오늘이면 지금 시각으로) · 안 토함 · 줄 고치기
+  const va = e.target.closest('[data-vadd]');
+  if (va) {
+    const k = ui.date;
+    const t = va.dataset.vadd;
+    const at = k === today ? nowHM() : '';
+    if (navigator.vibrate) navigator.vibrate(8);
+    undoable(`${vomitLabel(t)} 구토 1회 기록했어요${at ? ` (${hm(at)})` : ''}`, () => {
+      const c = { ...(state.cond[k] || {}) };
+      c.vl = [...vomitList(c), at ? { t, at } : { t }];
+      delete c.vo; // 안 토함 · 예전 1회/2회 이상 기록은 새 기록으로 바뀐다
+      state.cond[k] = c;
+    });
+    return;
+  }
+  if (e.target.closest('[data-vnone]')) {
+    const cur = condOf(ui.date);
+    setCond(ui.date, 'vo', cur && cur.vo === '0' ? null : '0');
+    renderCond();
+    return;
+  }
+  const vi = e.target.closest('[data-vi]');
+  if (vi) { openVomit(ui.date, +vi.dataset.vi); return; }
   const b = e.target.closest('.chips [data-v]');
   if (!b) return;
   const f = b.parentElement.dataset.f;
@@ -238,6 +306,68 @@ function updateCondHead() {
   s.textContent = sum || '기록하기';
   s.classList.toggle('bad', hasSymptom(c));
 }
+
+/* ───────── 구토 한 줄 고치기 (시트) ───────── */
+let voCtx = null; // { k, i, t, b }
+function renderVomitFields() {
+  const x = voCtx;
+  $('vo-fields').innerHTML = `<div class="sh-group"><p>종류</p><div class="chips dy-chips" role="group" aria-label="구토 종류">
+      ${VOMIT.map(([t, l]) => `<button type="button" data-vt="${t}" aria-pressed="${x.t === t}">${l}</button>`).join('')}</div></div>
+    <div class="sh-group"><p>함께 본 것</p><div class="chips" role="group" aria-label="피 섞임">
+      <button type="button" class="bad" data-vb aria-pressed="${!!x.b}">피 섞임</button></div></div>`;
+}
+function openVomit(k, i) {
+  const x = vomitList(condOf(k))[i];
+  if (!x) return;
+  voCtx = { k, i, t: x.t || 'etc', b: !!x.b };
+  $('vo-title').textContent = `${k === today ? '오늘' : ml(k)} 구토 기록`;
+  $('vo-at').value = x.at || '';
+  $('vo-memo').value = x.n || '';
+  renderVomitFields();
+  $('vo-sheet').hidden = false;
+}
+function closeVomit() {
+  $('vo-sheet').hidden = true;
+  voCtx = null;
+  document.activeElement.blur();
+}
+$('vo-sheet').addEventListener('click', (e) => {
+  if (e.target.closest('[data-close]')) { closeVomit(); return; }
+  if (!voCtx) return;
+  const t = e.target.closest('[data-vt]');
+  if (t) { voCtx.t = t.dataset.vt; renderVomitFields(); return; }
+  if (e.target.closest('[data-vb]')) { voCtx.b = !voCtx.b; renderVomitFields(); }
+});
+$('vo-sheet').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVomit(); });
+$('vo-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const x = voCtx;
+  if (!x) return;
+  const rec = { t: x.t };
+  if ($('vo-at').value) rec.at = $('vo-at').value;
+  if (x.b) rec.b = 1;
+  const n = $('vo-memo').value.trim();
+  if (n) rec.n = n;
+  closeVomit();
+  undoable(`${ml(x.k)} 구토 기록을 고쳤어요`, () => {
+    const c = { ...(state.cond[x.k] || {}) };
+    const vl = vomitList(c).slice();
+    vl[x.i] = rec;
+    c.vl = vl;
+    state.cond[x.k] = c;
+  });
+});
+$('vo-del').addEventListener('click', () => {
+  const x = voCtx;
+  if (!x) return;
+  closeVomit();
+  undoable(`${ml(x.k)} 구토 기록 1회를 지웠어요`, () => {
+    const c = { ...(state.cond[x.k] || {}) };
+    const vl = vomitList(c).filter((_, j) => j !== x.i);
+    if (vl.length) c.vl = vl; else delete c.vl;
+    if (Object.keys(c).length) state.cond[x.k] = c; else delete state.cond[x.k];
+  });
+});
 
 /* ───────── 진료 전 요약 ───────── */
 function careSummaryData() {
@@ -268,7 +398,7 @@ function careSummaryData() {
     for (const [k, r] of recs) if (r[f]) (c[r[f]] = c[r[f]] || []).push(k);
     return c;
   };
-  const vomit = recs.filter(([, r]) => r.vo && r.vo !== '0').map(([k, r]) => ({ k, n: +r.vo }));
+  const vomit = recs.filter(([, r]) => vomited(r)).map(([k, r]) => ({ k, ...vomitCount(r), list: vomitList(r).slice().sort((a, b) => timeKey(a.at) - timeKey(b.at)) }));
   const weights = recs.filter(([, r]) => r.w).map(([k, r]) => ({ k, w: r.w }));
   const notes = recs.filter(([, r]) => r.n).map(([k, r]) => ({ k, n: r.n }));
   const teeth = recs.filter(([, r]) => r.th).length;
@@ -305,14 +435,32 @@ function renderCareSummary() {
   const cond = [];
   if (s.recs.length) {
     cond.push(`기록한 날 ${s.recs.length}일 / ${s.days}일`);
-    for (const x of COND.filter((c) => c.f !== 'vo')) {
+    for (const x of COND) {
       const cnt = s[x.f];
       const parts = x.opts.filter(([v]) => cnt[v]).map(([v, l]) => `${l} ${cnt[v].length}일${x.bad.includes(v) ? ` (${dl(cnt[v])})` : ''}`);
       if (parts.length) cond.push(`${x.label}: ${parts.join(' · ')}`);
     }
     if (s.vomit.length) {
       const total = s.vomit.reduce((a, v) => a + v.n, 0);
-      cond.push(`구토: ${s.vomit.length}일, ${total}회${s.vomit.some((v) => v.n >= 2) ? ' 이상' : ''} (${s.vomit.map((v) => `${ml(v.k)}${v.n >= 2 ? ' 2회+' : ''}`).join(', ')})`);
+      const all = s.vomit.flatMap((v) => v.list.map((x) => ({ ...x, k: v.k })));
+      const types = vomitTypes(all);
+      cond.push(`구토: ${s.vomit.length}일, ${total}회${s.vomit.some((v) => v.plus) ? ' 이상' : ''}${types ? ` (${types})` : ''}`);
+      cond.push(`구토 기록: ${s.vomit.map((v) => `${ml(v.k)} ${v.list.length ? v.list.map(vomitEntry).join(', ') : `${v.n}회${v.plus ? ' 이상' : ''}`}`).join(' / ')}`);
+      // 피 섞임은 따로 눈에 띄게
+      const blood = all.filter((x) => x.b);
+      if (blood.length) cond.push(`⚠ 피 섞인 구토: ${blood.length}회 (${blood.map((x) => `${ml(x.k)}${x.at ? ` ${hm(x.at)}` : ''} ${vomitLabel(x.t)}`).join(', ')})`);
+      // 시간대: 같은 종류가 아침(4–10시)에 몰려 있으면 사실대로 (판단은 진료에서)
+      for (const [t, l] of VOMIT) {
+        const timed = all.filter((x) => x.t === t && x.at);
+        const am = timed.filter((x) => timeKey(x.at) < 10 * 60).length;
+        if (timed.length >= 2 && am * 3 >= timed.length * 2) cond.push(`${l} 구토 ${timed.length}번 중 ${am}번이 아침(4–10시)이었어요`);
+      }
+      // 약 먹자마자 토한 날: 그 날 챙긴 투약과 함께
+      const med = all.filter((x) => x.t === 'med');
+      if (med.length) {
+        const given = (k) => [...new Set(state.events.filter((ev) => isDose(ev) && ev.done && ev.done[k]).map((ev) => ev.title))].join('·');
+        cond.push(`약 먹자마자 토함: ${med.length}회 (${med.map((x) => `${ml(x.k)}${given(x.k) ? ` ${given(x.k)}` : ''}`).join(', ')}) — 다시 먹여야 하는지 확인`);
+      }
     } else if (s.recs.some(([, r]) => r.vo === '0')) cond.push('구토: 없음');
     if (s.teeth) cond.push(`양치: ${s.teeth}일 / ${s.days}일`);
   }

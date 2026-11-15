@@ -167,8 +167,8 @@ function renderHealth() {
         <div class="chips" data-why="lateCat">${CAT_WATCH.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${cw.includes(v)}">${l}</button>`).join('')}</div></div>`;
       // 구토를 확인한 밤인데 고양이 컨디션에 구토 기록이 없으면 알려 준다
       const c = condOf(d);
-      if (cw.includes('vomit') && !(c && c.vo && c.vo !== '0')) {
-        row += `<p class="h-nudge">${ml(d)} 고양이 컨디션에 구토 기록이 없어요 <button type="button" data-vo="${d}">구토 1회로 기록</button></p>`;
+      if (cw.includes('vomit') && !vomited(c)) {
+        row += `<p class="h-nudge">${ml(d)} 고양이 컨디션에 구토 기록이 없어요 <button type="button" data-vo="${d}">구토 기록하기</button></p>`;
       }
     }
     return row;
@@ -258,10 +258,12 @@ $('health').addEventListener('click', (e) => {
   }
   const vo = e.target.closest('[data-vo]');
   if (vo) {
+    // 그 날 고양이 컨디션을 펼쳐서 종류를 골라 적게 한다
     const d = vo.dataset.vo;
-    undoable(`${ml(d)} 고양이 구토 1회로 기록했어요`, () => {
-      state.cond[d] = { ...(state.cond[d] || {}), vo: '1' };
-    });
+    condOpenFor = d;
+    goDate(d);
+    $('cond').scrollIntoView({ block: 'start' });
+    toast('구토 종류를 눌러 적어 주세요');
     return;
   }
   const cw = e.target.closest('[data-why="lateCat"] [data-v]');

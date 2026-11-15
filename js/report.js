@@ -77,7 +77,7 @@ function firstUse() {
 /* 고양이가 아프거나(구토 · 밤에 지켜봄) 병원에 간 날 — 이런 날 기록이 비어도 다그치지 않는다 */
 const catHardDay = (k, visitDays) => {
   const c = condOf(k);
-  return !!(c && c.vo && c.vo !== '0') || visitDays.has(k) || catNight(k) || catNight(addDays(k, -1));
+  return vomited(c) || visitDays.has(k) || catNight(k) || catNight(addDays(k, -1));
 };
 /* 출근일 공부를 시작한 시각 (분) → '저녁 7:10' */
 const clockWord = (n) => {
@@ -173,13 +173,19 @@ function analyze(id) {
   if (m.gap.len) for (let k = m.gap.from; k <= m.gap.to; k = addDays(k, 1)) if (catHardDay(k, visitDays)) m.gap.hard++;
 
   // 고양이 컨디션
-  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, w: [], th: 0 };
+  const cd = { days: 0, sym: 0, vomitDays: 0, vomit: 0, plus: false, vlist: [], w: [], th: 0 };
   for (let k = start; k <= last; k = addDays(k, 1)) {
     const c = condOf(k);
     if (!c) continue;
     cd.days++;
     if (hasSymptom(c)) cd.sym++;
-    if (c.vo && c.vo !== '0') { cd.vomitDays++; cd.vomit += +c.vo; }
+    if (vomited(c)) {
+      const v = vomitCount(c);
+      cd.vomitDays++;
+      cd.vomit += v.n;
+      cd.plus = cd.plus || v.plus;
+      cd.vlist.push(...vomitList(c));
+    }
     if (c.w) cd.w.push({ k, w: c.w });
     if (c.th) cd.th++;
   }
@@ -529,7 +535,11 @@ function renderReport(id) {
   if (m.visits.length) tiles.push(['진료', `${m.visits.filter((v) => v.done).length}<small>회</small>`, '']);
   if (m.cond.days) tiles.push(['컨디션 기록', `${m.cond.days}<small>일</small>`, m.cond.sym ? `<small>이상 ${m.cond.sym}일</small>` : '']);
   if (m.cond.th) tiles.push(['고양이 양치', `${m.cond.th}<small>/${m.days}일</small>`, '']);
-  if (m.cond.vomit) tiles.push(['구토', `${m.cond.vomit}<small>회${m.cond.vomit > m.cond.vomitDays ? '+' : ''}</small>`, `<small>${m.cond.vomitDays}일</small>`]);
+  if (m.cond.vomit) {
+    const blood = m.cond.vlist.filter((x) => x.b).length;
+    const types = vomitTypes(m.cond.vlist, 3);
+    tiles.push(['구토', `${m.cond.vomit}<small>회${m.cond.plus ? '+' : ''}</small>`, `<small>${m.cond.vomitDays}일${types ? ` · ${types}` : ''}${blood ? ` · 피 섞임 ${blood}` : ''}</small>`]);
+  }
   if (m.cond.w.length >= 2) {
     const a = m.cond.w[0].w, b = m.cond.w[m.cond.w.length - 1].w;
     const d = Math.round((b - a) * 100) / 100;

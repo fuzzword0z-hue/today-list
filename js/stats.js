@@ -73,6 +73,7 @@ function renderStats() {
     ...didItems().map((x) => [`${esc(x.label)}한 날`, didDays(x.id, start, to), '일']).filter(([, n]) => n).slice(0, 2), // 한 날이 있는 것만
   ].map(([l, v, u]) => `<div class="card"><div class="card-label">${l}</div><div class="card-value">${v}<small>${u}</small></div></div>`).join('');
 
+  renderHabits(start, end);
   if (ui.mode === 'week') renderWeek(start);
   else if (ui.mode === 'month') renderMonth(start, end);
   else renderYear(parse(start).getFullYear());
@@ -174,12 +175,109 @@ function renderDetail() {
   }
   const s = dayStat(ui.sel);
   const d = parse(ui.sel);
-  const what = s ? `${s.total}개 중 <b>${s.done}개</b> 완료 · ${Math.round((s.done / s.total) * 100)}%` : '기록 없음';
+  // 끝낸 일 · 그 날 한 것 (명상은 아침 · 밤)
+  const did = didOf(ui.sel).map((id) => {
+    const l = didLabel(id);
+    if (!l || id !== state.medId) return l;
+    const m = medOf(ui.sel).map((x) => (x === 'am' ? '아침' : '밤'));
+    return m.length ? `${l}(${m.join('·')})` : l;
+  }).filter(Boolean);
+  const what = [s ? `끝낸 일 <b>${s.done}개</b>${s.done < s.total ? ` · 남은 일 ${s.total - s.done}개` : ''}` : '', did.length ? `한 것 ${esc(did.join(' · '))}` : '']
+    .filter(Boolean).join(' · ') || '기록 없음';
   el.innerHTML = `<span class="d-text"><b>${md(ui.sel)} (${WD[d.getDay()]})</b> · ${what}</span><button id="open-day">이 날 보기 ›</button>`;
   $('open-day').addEventListener('click', () => {
     goDate(ui.sel);
   });
 }
+
+/* ───────── 습관 트래커 (오늘 한 것: 운동 · 공부 · 명상 · 직접 더한 것, 7-22) ─────────
+ * 한 날만 채운다. 빈 칸은 흐리게만 두고 '못 한 날'로 세지 않는다 (연속 기록 · 비율 없음).
+ * 주 · 월: 습관마다 한 줄, 날마다 한 칸 (명상은 위 반 = 일어나서 · 아래 반 = 자기 전). 칸을 누르면 그 날을 아래에 보여 준다.
+ * 년: 습관마다 한 줄, 달마다 한 칸에 한 날 수 (그 달에 자주 할수록 진하게). 칸을 누르면 그 달로.
+ * 아래 줄에는 해낸 쪽만 짚는다: 한 날 수, 명상 아침 · 밤, 자주 한 요일 (월 · 주) · 가장 많이 한 달 (년). */
+const habitList = (start, end) => state.didItems.filter((x) => !x.off || didDays(x.id, start, end));
+function habitCell(x, k) {
+  if (!didOf(k).includes(x.id)) return '';
+  if (x.id !== state.medId) return 'on';
+  const m = medOf(k);
+  return m.length === 1 ? m[0] : 'on'; // 명상: 한 때만 했으면 반만
+}
+
+function habitNotes(items, start, to) {
+  const out = [];
+  for (const x of items) {
+    const ks = Object.keys(state.did).filter((k) => k >= start && k <= to && didOf(k).includes(x.id));
+    if (!ks.length) continue;
+    const parts = [`${x.label} ${ks.length}일`];
+    if (x.id === state.medId) {
+      const c = medCounts(start, to);
+      if (c.am + c.pm) parts.push([c.am ? `아침 ${c.am}번` : '', c.pm ? `밤 ${c.pm}번` : ''].filter(Boolean).join(' · '));
+    }
+    if (ui.mode === 'year') {
+      const byM = Array(12).fill(0);
+      for (const k of ks) byM[parse(k).getMonth()]++;
+      const best = byM.indexOf(Math.max(...byM));
+      if (ks.length >= 3) parts.push(`가장 많이 한 달 ${best + 1}월 (${byM[best]}일)`);
+    } else if (ks.length >= 4) {
+      const byW = Array(7).fill(0);
+      for (const k of ks) byW[parse(k).getDay()]++;
+      const max = Math.max(...byW);
+      if (max >= 2) parts.push(`주로 ${byW.map((n, i) => (n === max ? WD[i] : '')).filter(Boolean).join('·')}요일`);
+    }
+    out.push(parts.join(' · '));
+  }
+  return out.length ? out : ['오늘 화면의 \'오늘 한 것\'을 누르면 여기에 쌓여요.'];
+}
+
+function renderHabits(start, end) {
+  const el = $('habits');
+  const items = habitList(start, end);
+  if (!items.length) { el.innerHTML = ''; return; }
+  const to = end < today ? end : today;
+  const row = (x, cells, n, sum) => `<div class="hb-row"><span class="hb-lab">${esc(x.label)}</span>
+    <div class="hb-grid" style="--n:${n}">${cells}</div><span class="hb-sum">${sum || ''}</span></div>`;
+  let grid = '';
+  if (ui.mode === 'year') {
+    const y = parse(start).getFullYear();
+    const head = Array.from({ length: 12 }, (_, m) => `<span>${m + 1}</span>`).join('');
+    grid = `<div class="hb-row hb-head"><span class="hb-lab"></span><div class="hb-grid" style="--n:12">${head}</div><span class="hb-sum">일</span></div>
+      ${items.map((x) => row(x, Array.from({ length: 12 }, (_, m) => {
+        const a = `${y}-${pad(m + 1)}-01`;
+        const b = monthEnd(a);
+        const n = a > today ? 0 : didDays(x.id, a, b < today ? b : today);
+        const r = n / new Date(y, m + 1, 0).getDate();
+        const lv = !n ? '' : r >= 0.75 ? ' lv4' : r >= 0.5 ? ' lv3' : r >= 0.25 ? ' lv2' : ' lv1';
+        return `<button class="hb-mcell${lv}${a > today ? ' future' : ''}" data-m="${a}" aria-label="${m + 1}월 ${esc(x.label)} ${n}일">${n || ''}</button>`;
+      }).join(''), 12, didDays(x.id, start, to))).join('')}`;
+  } else {
+    const days = [];
+    for (let k = start; k <= end; k = addDays(k, 1)) days.push(k);
+    const n = days.length;
+    const head = days.map((k) => {
+      const d = parse(k).getDate();
+      return `<span>${ui.mode === 'week' ? WD[parse(k).getDay()] : [1, 10, 20].includes(d) || d === n ? d : ''}</span>`;
+    }).join('');
+    grid = `<div class="hb-row hb-head"><span class="hb-lab"></span><div class="hb-grid" style="--n:${n}">${head}</div><span class="hb-sum">일</span></div>
+      ${items.map((x) => row(x, days.map((k) => {
+        const c = habitCell(x, k);
+        return `<button class="hb-cell${c ? ` ${c}` : ''}${k > today ? ' future' : ''}${k === today ? ' today' : ''}${k === ui.sel ? ' sel' : ''}" data-k="${k}" aria-label="${md(k)} ${esc(x.label)}${c ? ' 했어요' : ''}"></button>`;
+      }).join(''), n, didDays(x.id, start, to))).join('')}`;
+  }
+  const med = ui.mode !== 'year' && items.some((x) => x.id === state.medId);
+  el.innerHTML = `<h2 class="sub-head">습관 <small>한 날만 채워요</small></h2>
+    <div class="habits-grid ${ui.mode}">${grid}</div>
+    ${med ? '<p class="hb-legend"><i class="hb-cell am"></i>일어나서 <i class="hb-cell pm"></i>자기 전 <i class="hb-cell on"></i>둘 다 · 명상 칸</p>' : ''}
+    <ul class="hb-notes">${habitNotes(items, start, to).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
+}
+
+$('habits').addEventListener('click', (e) => {
+  const m = e.target.closest('[data-m]');
+  if (m) { ui.mode = 'month'; ui.anchor = m.dataset.m; ui.sel = null; renderStats(); return; }
+  const b = e.target.closest('[data-k]');
+  if (!b) return;
+  ui.sel = ui.sel === b.dataset.k ? null : b.dataset.k;
+  renderStats();
+});
 
 $('chart').addEventListener('click', (e) => {
   const b = e.target.closest('[data-k]');

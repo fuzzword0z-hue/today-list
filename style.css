@@ -1373,3 +1373,33 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .med-done p { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
 .med-done button { min-height: 44px; margin: 0 4px; padding: 10px 18px; border-radius: 999px; background: #1d2230; color: #e6e6ee; font-size: 15px; font-weight: 600; }
 .med-done #med-finish { background: #7eaaff; color: #0d0f14; }
+
+/* ───────── 통계: 습관 트래커 (한 날만 채운다) ───────── */
+.habits { margin: -8px 0 20px; }
+.habits .sub-head { margin-top: 0; }
+.habits .sub-head small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--text-3); }
+.habits-grid { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.hb-row { display: flex; align-items: center; gap: 6px; }
+.hb-lab { flex: none; width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+.hb-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; }
+.habits-grid.week .hb-grid, .habits-grid.year .hb-grid { gap: 4px; }
+.hb-head .hb-grid span { overflow: visible; white-space: nowrap; text-align: center; font-size: 10px; color: var(--text-3); }
+.hb-sum { flex: none; width: 24px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.hb-head .hb-sum { font-size: 10px; font-weight: 400; color: var(--text-3); }
+.hb-cell { display: block; aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 3px; background: var(--track); }
+.habits-grid.week .hb-cell { border-radius: 8px; }
+.hb-cell.on { background: var(--accent); }
+.hb-cell.am { background: linear-gradient(var(--accent) 50%, var(--track) 50%); }
+.hb-cell.pm { background: linear-gradient(var(--track) 50%, var(--accent) 50%); }
+.hb-cell.future { opacity: .4; }
+.hb-cell.today { box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.hb-cell.sel { box-shadow: 0 0 0 1.5px var(--text); }
+.hb-mcell { aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 6px; background: var(--track); font-size: 11px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.hb-mcell.future { opacity: .4; }
+.hb-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 8px 4px 0; font-size: 11.5px; color: var(--text-3); }
+.hb-legend .hb-cell { width: 10px; }
+.hb-notes { margin: 8px 4px 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.hb-mcell.lv1 { background: var(--lv1); color: var(--lv-ink-1); }
+.hb-mcell.lv2 { background: var(--lv2); color: var(--lv-ink-2); }
+.hb-mcell.lv3 { background: var(--lv3); color: var(--lv-ink-3); }
+.hb-mcell.lv4 { background: var(--lv4); color: var(--lv-ink-4); }

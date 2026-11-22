@@ -227,7 +227,11 @@ function renderReport(id) {
   // 해낸 것
   const done = [];
   if (m.total) done.push(['끝낸 일', `${m.done}<small>개</small>`, '']);
-  for (const x of m.did) if (x.days) done.push([`${x.label}한 날`, `${x.days}<small>일</small>`, '']); // 한 날이 있는 것만
+  for (const x of m.did) {
+    if (!x.days) continue; // 한 날이 있는 것만
+    const mc = x.id === state.medId ? medCounts(m.from, m.last) : null; // 명상은 아침 · 밤 횟수도
+    done.push([`${x.label}한 날`, `${x.days}<small>일</small>`, mc && mc.am + mc.pm ? `<small>${[mc.am ? `아침 ${mc.am}` : '', mc.pm ? `밤 ${mc.pm}` : ''].filter(Boolean).join(' · ')}</small>` : '']);
+  }
   for (const c of m.care) done.push([c.ev.title, `${c.given}<small>번</small>`, c.skipped.length ? `<small>못 함 ${c.skipped.length}번</small>` : '']);
   if (m.visits.length) done.push(['진료', `${m.visits.filter((v) => v.done).length}<small>번</small>`, '']);
   if (m.dy.days) done.push(['일기 쓴 날', `${m.dy.days}<small>일</small>`, m.dy.lines ? `<small>감사 ${m.dy.lines}줄</small>` : '']);

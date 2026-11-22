@@ -2,16 +2,17 @@
 
 /* ═════════════════ 일기 ═════════════════
  * 하루에 한 장. 맨 위 '나침반'(내가 지향하는 문장) 아래에:
- *   ① 오늘 내 기준으로 인정하는 것 3가지 — 앱 기록에서 '지킨 약속'을 칩으로 보여 주고, 누르면 빈 줄에 들어간다
+ *   ① 오늘 해낸 것 — 한 줄만 보이고 [+ 한 줄 더]로 세 줄까지 (빈 칸 여러 개가 숙제처럼 보이지 않게, 7-20).
+ *      앱 기록(끝낸 할 일 · 오늘 한 것 · 케어)을 칩으로 보여 주고, 누르면 줄에 들어간다
  *      ("내가 나를 인정한다"는 말이 공허하지 않게, 나를 믿을 근거를 실제 기록에서 꺼내 준다)
- *   ② 감사일기 — 한 줄에 하나씩 (20줄 안팎을 기준으로 줄 수를 보여 줌, 그 이상도 저장은 됨)
+ *   ② 감사일기 — 한 줄에 하나씩. 줄 수만 보여 준다 (분모 없음 — 한 줄이면 충분)
  *   ③ 마음에 이름 붙이기 — 무거운 마음을 고르면 '아끼는 친구에게 하듯 나에게 한마디' 칸이 열린다
- *   ④ 오늘의 질문 (하루 하나씩 돌아가며)
+ *   '더 쓰고 싶을 때'(접힘) 안에: ④ 오늘의 질문 (하루 하나씩 돌아가며)
  *   나를 채우는 시간 — 혼자 회복(폰 없이 15분 · 독서 · 호흡 · 햇볕 …)과 연결(짧은 대화 · 안부 · 고마움 · 도움 청하기).
  *      이미 혼자 잘 지내는 사람에게는 '얼마나 자주 혼자'보다 '내가 고른 혼자인지'와 반대쪽인 '기대는 연결'이 연습 거리라서
  *      (기댈 곳이 있다고 느낄수록 혼자서 더 과감해진다 — 의존의 역설), 돈이 거의 안 드는 일상 위주로 고른다
  *   흔들린 순간 — 인정·애정 욕구가 올라온 순간을 그때그때 (언제 · 마음 · 그때 한 행동 · 아무도 모른다면)
- *   나를 지키는 환경 — 주간 SNS 시간, 월 지출 · 비상금 (몇 개월치인지)
+ *   (주간 SNS 시간 · 월 지출과 비상금을 적던 '나를 지키는 환경'은 쓰지 않게 되어 없앴다 — state.sns · money는 백업에 남는다)
  * 욕구를 없애는 게 아니라 끌려다니지 않는 연습이라, 모두 '알아차린 것'을 쌓는 곳이다:
  * 점수 · 연속 기록을 붙이지 않고, 안 쓴 날을 탓하지 않는다. 감정은 이름만 붙이고, 숫자는 행동과 환경에만 쓴다.
  *
@@ -20,13 +21,10 @@
  *                                  fill: [FILL_REST · FILL_LINK id 또는 직접 더한 이름], sh: [{ at, when, feel: [], act: [], nb, t }] } }
  *   (예전 '혼자만의 시간' alone은 처음 열 때 fill로 옮긴다 — core.js normalize)
  * state.compass = [문장]   state.compassHide = 접어 둠   state.feelCustom = [직접 더한 마음 이름]   state.fillCustom = [직접 더한 회복 활동]
- * state.sns   = { 주 시작(일요일) 'YYYY-MM-DD': 하루 평균 분 }   (휴대폰 디지털 웰빙에서 보고 적는다 — 웹앱은 사용 시간을 못 읽는다)
- * state.money = { 'YYYY-MM': { spend: 만원, fund: 만원 } }   비상금 ÷ 최근 3개월 지출 평균 = 몇 개월치 (목표 3–6개월)
  * 이 휴대폰에만 저장되고, 백업 파일(내보내기)에 함께 담긴다. 하루는 다른 탭처럼 새벽 4시에 바뀐다.
  * 피드백은 앱이 하지 않는다: '이번 달 일기 복사'로 채팅에 붙여 넣으면 감사 · 인정 · 흔들린 순간의 패턴과
- * 힘들었던 부분의 인지 왜곡, 생각 · 감정을 돌려 볼 방향을 같이 살펴본다. 리포트에는 숫자만 넣는다 (점수에는 넣지 않음). */
+ * 힘들었던 부분의 인지 왜곡, 생각 · 감정을 돌려 볼 방향을 같이 살펴본다. 리포트에는 숫자만 넣는다. */
 
-const DIARY_LINES = 20; // 줄 수 기준 (넘어도 저장)
 const DIARY_MAX = 2000; // 하루 최대 글자 수 (저장 공간을 위해)
 const OWN_N = 3;
 const FEELS = ['외로움', '서운함', '인정받고 싶음', '불안', '지침', '슬픔', '화남', '편안함', '뿌듯함', '기쁨', '설렘', '고마움'];
@@ -59,7 +57,6 @@ const SH_WHEN = [['got', '인정받았을 때'], ['not', '못 받았을 때'], [
 const SH_FEEL = ['서운함', '불안', '외로움', '부끄러움', '질투', '들뜸', '안도', '뿌듯함'];
 const SH_ACT = [['check', '반응 확인'], ['push', '답장 재촉'], ['change', '결정을 바꿈'], ['pass', '그냥 느끼고 지나감'], ['help', '도움을 청함'], ['etc', '그 밖에']];
 const SH_NB = [['yes', '했을 것'], ['no', '안 했을 것'], ['unsure', '모르겠다']];
-const FUND_GOAL = '3–6개월';
 
 $('dy-text').maxLength = DIARY_MAX;
 const diaryOf = (k) => state.diary[k] || null;
@@ -117,7 +114,6 @@ function renderDiary() {
   renderFill();
   renderShakes();
   renderDiaryMonth();
-  renderEnv();
 }
 
 /* ───────── 나침반 ───────── */
@@ -164,33 +160,36 @@ function keptPromises(k) {
   const out = [];
   const done = (state.days[k] || []).filter((t) => t.d).length;
   if (done) out.push(`할 일 ${done}개 끝냄`);
-  const st = state.studies[k];
-  if (st && st.min) out.push(`공부 ${fmtMin(st.min)}`);
-  if (st && st.review) out.push('아침 복습');
-  const wr = state.workouts[k];
-  if (wr && (wr.ex20 || wr.bike || arr(wr.rows).length || EXERCISES.some((ex) => wr[ex.id]))) out.push(wr.ex20 ? '20분 운동' : '운동');
-  if (wr && wr.sq) out.push(`식후 스쿼트 ${wr.sq}회`);
+  for (const id of didOf(k)) if (didLabel(id)) out.push(`${didLabel(id)}했어요`);
   const care = [...new Set(state.events.filter((ev) => ev.cat === 'care' && ev.done && ev.done[k]).map((ev) => ev.title))];
   for (const t of care) out.push(`${t} 챙김`);
-  if (state.hstart && k >= state.hstart) {
-    if (!hOn('snack', k)) out.push('과자 안 먹음');
-    if (k < today && !hOn('late', k)) out.push('11:30 전에 잠');
-  }
   return out;
 }
 
+/* 한 줄만 보이고 [+ 한 줄 더]로 늘린다 (빈 칸 여러 개가 숙제처럼 보이지 않게). 적어 둔 줄은 다 보인다 */
+let ownShown = 1;
 function renderOwn() {
   const k = ui.diaryDate;
   const m = mindOf(k);
   const own = Array.from({ length: OWN_N }, (_, i) => (arr(m.own)[i] || ''));
+  const filled = own.reduce((a, t, i) => (t.trim() ? i + 1 : a), 0);
+  const n = Math.min(OWN_N, Math.max(1, filled, ownShown));
   const chips = keptPromises(k);
-  const ph = ['예: 퇴근하고 바로 1차 공부를 시작했다', '예: 피곤했는데 고양이 약을 챙겼다', '예: 답장이 없어도 내 할 일을 했다'];
-  $('dy-own').innerHTML = `<div class="wo-head"><span class="wo-name">오늘 인정하는 것 3가지</span><span class="wo-target">남의 반응 말고, 내 기준으로 오늘 내가 한 일</span></div>
-    ${chips.length ? `<div class="dy-kept"><span>오늘 지킨 약속 · 누르면 줄에 들어가요</span><div class="chips dy-chips" role="group" aria-label="오늘 지킨 약속 (누르면 줄에 들어가요)">${chips.map((c) => `<button type="button" data-kept="${esc(c)}" aria-pressed="${own.includes(c)}">${esc(c)}</button>`).join('')}</div></div>` : ''}
-    ${own.map((t, i) => `<div class="dy-line"><span class="dy-no">${i + 1}</span><textarea class="dy-in" data-own="${i}" rows="1" maxlength="120" aria-label="인정하는 것 ${i + 1}" placeholder="${ph[i]}">${esc(t)}</textarea></div>`).join('')}`;
+  const ph = ['예: 퇴근하고 단어 10개 외웠다', '예: 피곤했는데 고양이 약을 챙겼다', '예: 답장이 없어도 내 할 일을 했다'];
+  $('dy-own').innerHTML = `<div class="wo-head"><span class="wo-name">오늘 해낸 것</span><span class="wo-target">남의 반응 말고, 내 기준으로 · 한 줄이면 충분해요</span></div>
+    ${chips.length ? `<div class="dy-kept"><span>오늘 한 것 · 누르면 줄에 들어가요</span><div class="chips dy-chips" role="group" aria-label="오늘 한 것 (누르면 줄에 들어가요)">${chips.map((c) => `<button type="button" data-kept="${esc(c)}" aria-pressed="${own.includes(c)}">${esc(c)}</button>`).join('')}</div></div>` : ''}
+    ${own.slice(0, n).map((t, i) => `<div class="dy-line"><textarea class="dy-in" data-own="${i}" rows="1" maxlength="120" aria-label="해낸 것 ${i + 1}" placeholder="${ph[i]}">${esc(t)}</textarea></div>`).join('')}
+    ${n < OWN_N ? '<button type="button" class="dy-more-line" data-own-more>+ 한 줄 더</button>' : ''}`;
   for (const t of $('dy-own').querySelectorAll('textarea')) growText(t);
 }
 $('dy-own').addEventListener('click', (e) => {
+  if (e.target.closest('[data-own-more]')) {
+    ownShown = Math.min(OWN_N, Math.max(ownShown, ...[...$('dy-own').querySelectorAll('[data-own]')].map((x) => +x.dataset.own + 1)) + 1);
+    renderOwn();
+    const all = $('dy-own').querySelectorAll('[data-own]');
+    all[all.length - 1].focus();
+    return;
+  }
   const c = e.target.closest('[data-kept]');
   if (!c) return;
   const k = ui.diaryDate;
@@ -202,6 +201,7 @@ $('dy-own').addEventListener('click', (e) => {
     const i = own.findIndex((x) => !x.trim());
     if (i < 0) { toast('세 줄이 다 찼어요. 한 줄을 비우면 넣을 수 있어요'); return; }
     own[i] = t;
+    ownShown = Math.max(ownShown, i + 1);
   }
   setMind(k, { own });
   renderOwn();
@@ -224,12 +224,9 @@ $('dy-own').addEventListener('input', (e) => {
 function updateDiaryCount() {
   const t = $('dy-text').value;
   const n = diaryLines(t);
-  const over = n > DIARY_LINES;
-  $('dy-count').textContent = `${n} / ${DIARY_LINES}줄`;
-  $('dy-count').classList.toggle('over', over);
+  $('dy-count').textContent = n ? `${n}줄` : ''; // 분모(20줄)는 보여 주지 않는다 — 한 줄이면 충분해서
   const rec = diaryOf(ui.diaryDate);
-  $('dy-status').textContent = over ? `${DIARY_LINES}줄을 넘었어요. 그래도 저장돼요.`
-    : rec ? `저장됨 · ${hhmm(rec.at)}` : '쓰면 바로 저장돼요';
+  $('dy-status').textContent = rec ? `저장됨 · ${hhmm(rec.at)}` : '쓰면 바로 저장돼요 · 한 줄이면 충분해요';
 }
 
 /* ───────── ③ 마음에 이름 붙이기 · 나에게 한마디 ───────── */
@@ -511,7 +508,7 @@ function dayParts(x) {
   const m = mindOf(x);
   const bul = (t) => t.split('\n').filter((l) => l.trim()).map((l) => `- ${l.trim()}`).join('\n');
   if (r) out.push(['감사', bul(r.t)]);
-  if (ownOf(m).length) out.push(['내 기준으로 인정한 것', ownOf(m).map((t) => `- ${t.trim()}`).join('\n')]);
+  if (ownOf(m).length) out.push(['오늘 해낸 것', ownOf(m).map((t) => `- ${t.trim()}`).join('\n')]);
   if (arr(m.feel).length) out.push(['마음', arr(m.feel).join(', ')]);
   if (m.self) out.push(['나에게', m.self.trim()]);
   if (m.q && m.q.a) out.push(['질문', `${m.q.t} → ${m.q.a.trim()}`]);
@@ -536,8 +533,6 @@ function diaryMonthText(k) {
     out.push('', `${ml(x)} (${WD[parse(x).getDay()]})`);
     for (const [h, v] of dayParts(x)) out.push(v.includes('\n') || v.startsWith('- ') ? `[${h}]\n${v}` : `[${h}] ${v}`);
   }
-  const env = envLines(k);
-  if (env.length) out.push('', '[이번 달 환경]', ...env);
   return out.join('\n');
 }
 
@@ -546,6 +541,7 @@ function goDiary(k) {
   flushSave();
   feelAdding = false;
   fillAdding = false;
+  ownShown = 1;
   ui.diaryDate = k;
   renderDiary();
 }
@@ -577,76 +573,9 @@ $('dy-month').addEventListener('click', async (e) => {
   }
 });
 
-/* ───────── 나를 지키는 환경: SNS 시간 · 지출 · 비상금 ───────── */
-const ymOf = (k) => k.slice(0, 7);
-const ymLabel = (ym) => `${+ym.slice(5)}월`;
-/* ym 달 기준 비상금이 몇 개월치인지: 그 달까지 가장 최근 비상금 ÷ 최근 3개월(적은 달만) 지출 평균 */
-function fundMonths(ym) {
-  const keys = Object.keys(state.money).filter((x) => x <= ym).sort();
-  const fk = [...keys].reverse().find((x) => state.money[x].fund > 0);
-  const spends = keys.filter((x) => state.money[x].spend > 0).slice(-3).map((x) => state.money[x].spend);
-  if (!fk) return null;
-  const fund = state.money[fk].fund;
-  const avg = spends.length ? spends.reduce((a, b) => a + b, 0) / spends.length : 0;
-  return { fund, avg, months: avg ? fund / avg : null };
-}
-const monthsText = (f) => (f && f.months !== null ? `약 ${Math.round(f.months * 10) / 10}개월치` : '');
-
-function renderEnv() {
-  const k = ui.diaryDate;
-  const env = $('dy-env');
-  const wsK = weekStart(k);
-  const sns = state.sns[wsK];
-  const prev = state.sns[addDays(wsK, -7)];
-  const ym = ymOf(k);
-  const mo = state.money[ym] || {};
-  const f = fundMonths(ym);
-  const sum = [sns !== undefined ? `SNS 하루 ${sns}분` : '', monthsText(f) ? `비상금 ${monthsText(f)}` : ''].filter(Boolean).join(' · ');
-  const open = env.open;
-  env.innerHTML = `<summary><span class="wo-name">나를 지키는 환경</span><span class="wo-target">${sum || 'SNS 시간 · 돈'}</span></summary>
-    <div class="dy-env-row"><label for="dy-sns">SNS 하루 평균<small>${ml(wsK)}–${ml(addDays(wsK, 6))} 주</small></label>
-      <input class="cond-w" id="dy-sns" type="number" inputmode="numeric" min="0" max="1440" step="1" placeholder="0" value="${sns ?? ''}"><span class="cond-unit">분</span>
-      ${prev !== undefined ? `<small class="dy-env-note">지난주 ${prev}분</small>` : ''}</div>
-    <p class="dy-hint">휴대폰 설정 → 디지털 웰빙에서 보고 일주일에 한 번 적어요. 비교를 부르는 시간이 줄면 흔들리는 순간도 줄어요.</p>
-    <div class="dy-env-row"><label for="dy-spend">${ymLabel(ym)} 지출</label>
-      <input class="cond-w" id="dy-spend" type="number" inputmode="numeric" min="0" max="100000" step="1" placeholder="0" value="${mo.spend ?? ''}"><span class="cond-unit">만원</span></div>
-    <div class="dy-env-row"><label for="dy-fund">비상금</label>
-      <input class="cond-w" id="dy-fund" type="number" inputmode="numeric" min="0" max="1000000" step="1" placeholder="0" value="${mo.fund ?? ''}"><span class="cond-unit">만원</span>
-      <small class="dy-env-note">${monthsText(f) ? `${monthsText(f)} · 목표 ${FUND_GOAL}` : f ? '지출을 적으면 몇 개월치인지 보여 드려요' : `목표: 생활비 ${FUND_GOAL}치`}</small></div>
-    <p class="dy-hint">한 달에 한 번, 지출 합계와 비상금만 적어요 (은행 앱에서 확인). 비상금은 원치 않는 관계에 머무르지 않게 해 주는 바닥이에요.</p>`;
-  env.open = open;
-}
-$('dy-env').addEventListener('change', (e) => {
-  const k = ui.diaryDate;
-  const v = e.target.value === '' ? null : Math.max(0, Math.round(+e.target.value));
-  if (e.target.id === 'dy-sns') {
-    if (v === null || !Number.isFinite(v) || v > 1440) delete state.sns[weekStart(k)];
-    else state.sns[weekStart(k)] = v;
-  } else if (e.target.id === 'dy-spend' || e.target.id === 'dy-fund') {
-    const f = e.target.id === 'dy-spend' ? 'spend' : 'fund';
-    const mo = { ...(state.money[ymOf(k)] || {}) };
-    if (v === null || !Number.isFinite(v)) delete mo[f]; else mo[f] = v;
-    if (Object.keys(mo).length) state.money[ymOf(k)] = mo; else delete state.money[ymOf(k)];
-  } else return;
-  save();
-  renderEnv();
-});
-
-/* 이번 달 환경 (복사 텍스트 · 리포트) */
-function envLines(k) {
-  const start = monthStart(k), end = monthEnd(k);
-  const out = [];
-  const weeks = Object.keys(state.sns).filter((w) => w >= addDays(start, -6) && w <= end).sort();
-  if (weeks.length) out.push(`SNS 하루 평균: ${weeks.map((w) => `${ml(w)} 주 ${state.sns[w]}분`).join(' · ')}`);
-  const mo = state.money[ymOf(k)];
-  const f = fundMonths(ymOf(k));
-  if (mo && (mo.spend || mo.fund)) out.push(`돈: ${[mo.spend ? `지출 ${mo.spend}만원` : '', mo.fund ? `비상금 ${mo.fund}만원` : ''].filter(Boolean).join(' · ')}${monthsText(f) ? ` (${monthsText(f)})` : ''}`);
-  return out;
-}
-
 /* ═════════ 리포트: '마음' 칸 (숫자만, 점수에는 넣지 않음) ═════════ */
 function analyzeMind(start, last) {
-  const r = { days: 0, own: 0, ownDays: 0, feel: {}, self: 0, q: 0, rest: {}, link: {}, restN: 0, linkN: 0, sh: 0, when: {}, act: {}, nb: {}, shAfterLate: 0, shLateKnown: 0, sns: [], fund: null };
+  const r = { days: 0, own: 0, ownDays: 0, feel: {}, self: 0, q: 0, rest: {}, link: {}, restN: 0, linkN: 0, sh: 0, when: {}, act: {}, nb: {} };
   const bump = (o, x) => { o[x] = (o[x] || 0) + 1; };
   for (const k in state.mind) {
     if (k < start || k > last) continue;
@@ -666,29 +595,18 @@ function analyzeMind(start, last) {
       if (s.when) bump(r.when, s.when);
       for (const a of arr(s.act)) bump(r.act, a);
       if (s.nb) bump(r.nb, s.nb);
-      // 몸의 리듬과 연결: 전날 밤 늦게 잤는지 (건강 카드를 쓰기 시작한 뒤만)
-      const prev = addDays(k, -1);
-      if (state.hstart && prev >= state.hstart) { r.shLateKnown++; if (hOn('late', prev)) r.shAfterLate++; }
     }
   }
-  r.sns = Object.keys(state.sns).filter((w) => w >= addDays(start, -6) && w <= last).sort().map((w) => [w, state.sns[w]]);
-  r.fund = fundMonths(last.slice(0, 7));
   return r;
 }
 const topText = (o, label = (x) => x, n = 5) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([x, c]) => `${label(x)} ${c}`).join(' · ');
 
 function mindSection(mi, yearly) {
-  if (!mi.days && !mi.sns.length && !(mi.fund && mi.fund.months !== null)) return ['', []];
+  if (!mi.days) return ['', []];
   const tiles = [];
-  if (mi.own) tiles.push(['인정한 것', `${mi.own}<small>개</small>`, `<small>${mi.ownDays}일</small>`]);
   if (mi.sh) tiles.push(['흔들린 순간', `${mi.sh}<small>번</small>`, mi.act.pass ? `<small>그냥 느끼고 지나감 ${mi.act.pass}</small>` : '']);
   if (mi.restN + mi.linkN) tiles.push(['나를 채우는 시간', `${mi.restN + mi.linkN}<small>번</small>`, `<small>회복 ${mi.restN} · 연결 ${mi.linkN}</small>`]);
   if (mi.q) tiles.push(['오늘의 질문', `${mi.q}<small>번 답함</small>`, '']);
-  if (mi.sns.length) {
-    const a = mi.sns[0][1], b = mi.sns[mi.sns.length - 1][1];
-    tiles.push(['SNS 하루 평균', `${b}<small>분</small>`, mi.sns.length > 1 ? `<small>${a}분 → ${b}분</small>` : `<small>${ml(mi.sns[0][0])} 주</small>`]);
-  }
-  if (mi.fund && mi.fund.months !== null) tiles.push(['비상금', `${Math.round(mi.fund.months * 10) / 10}<small>개월치</small>`, `<small>목표 ${FUND_GOAL}</small>`]);
   const dists = [];
   if (Object.keys(mi.feel).length) dists.push(['많이 붙인 마음 이름', topText(mi.feel)]);
   if (Object.keys(mi.when).length) dists.push(['흔들린 때', topText(mi.when, (x) => pairLabel(SH_WHEN, x))]);
@@ -697,9 +615,6 @@ function mindSection(mi, yearly) {
   if (mi.restN) dists.push(['혼자 회복', topText(mi.rest, fillLabel)]);
   if (mi.linkN) dists.push(['연결', topText(mi.link, fillLabel)]);
   else if (mi.restN >= 6) dists.push(['연결', '이번 기간엔 기록이 없어요. 혼자 잘 지내는 사람일수록 기대는 연습이 도움이 돼요 — 짧은 대화 하나도 충분해요.']);
-  if (mi.shLateKnown >= 3 && mi.shAfterLate * 2 >= mi.shLateKnown) {
-    dists.push(['몸의 리듬', `흔들린 순간 ${mi.shLateKnown}번 중 ${mi.shAfterLate}번이 늦게 잔 다음 날이었어요. 지친 몸은 마음을 더 크게 흔들어요.`]);
-  }
   const lines = [
     ...tiles.map(([l, v, d]) => `- ${l}: ${v.replace(/<[^>]+>/g, '')}${d ? ` (${d.replace(/<[^>]+>/g, '')})` : ''}`),
     ...dists.map(([l, v]) => `- ${l}: ${v}`),
@@ -707,6 +622,6 @@ function mindSection(mi, yearly) {
   const html = `<section class="r-sec r-mind"><h2>마음</h2>
     ${tiles.length ? `<div class="r-tiles">${tiles.map(([l, v, d]) => `<div class="r-tile"><span class="r-tl">${esc(l)}</span><span class="r-tv">${v}</span>${d}</div>`).join('')}</div>` : ''}
     ${dists.length ? `<ul class="r-dist">${dists.map(([l, v]) => `<li><b>${esc(l)}</b> ${esc(v)}</li>`).join('')}</ul>` : ''}
-    <p class="r-tip">마음 칸은 점수에 넣지 않아요. 알아차린 횟수일 뿐, 잘하고 못한 게 아니에요. 내용은 일기 탭의 '${yearly ? '그 달' : '이번 달'} 일기 복사'로 채팅에서 함께 봐요.</p></section>`;
+    <p class="r-tip">알아차린 횟수일 뿐, 잘하고 못한 게 아니에요. 내용은 일기 탭의 '${yearly ? '그 달' : '이번 달'} 일기 복사'로 채팅에서 함께 봐요.</p></section>`;
   return [html, lines];
 }

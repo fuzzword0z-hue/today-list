@@ -39,16 +39,17 @@ function renderToday() {
   $('today-events').innerHTML = evs.length
     ? `<li class="section-head">일정 ${evs.length}</li>${evs.map((ev) => eventRow(ev, k)).join('')}`
     : '';
+  renderHealthAlert();
+  renderDid();
   renderCond();
-  renderHealth();
 
   // 목록: 할 일 → 완료(완료한 순서) → 미룸
   const active = items.filter((t) => !t.d && !t.m);
   const doneList = items.filter((t) => t.d).sort((a, b) => (a.at || 0) - (b.at || 0));
   const movedList = items.filter((t) => t.m);
 
-  // 일정이나 컨디션·건강 카드가 위에 있으면 '할 일' 제목으로 구분
-  let html = (evs.length || !$('cond').hidden || !$('health').hidden) && items.length ? '<li class="section-head">할 일</li>' : '';
+  // 일정이나 오늘 한 것·컨디션 카드가 위에 있으면 '할 일' 제목으로 구분
+  let html = (evs.length || !$('did').hidden || !$('cond').hidden) && items.length ? '<li class="section-head">할 일</li>' : '';
   html += active.map(row).join('');
   if (doneList.length) html += `<li class="section-head">완료 ${doneList.length}</li>` + doneList.map(row).join('');
   if (movedList.length) html += `<li class="section-head">미룸 ${movedList.length}</li>` + movedList.map(row).join('');

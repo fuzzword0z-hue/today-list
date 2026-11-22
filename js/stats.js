@@ -57,40 +57,20 @@ function summarize(start, end) {
   return { done, total, perfect };
 }
 
-/* 연속 기록: 하루에 하나라도 완료한 날이 이어진 일수. 오늘은 아직 진행 중이라 0개여도 끊기지 않음 */
-function streaks() {
-  let cur = 0;
-  let k = today;
-  if (!(dayStat(k) || {}).done) k = addDays(k, -1);
-  while ((dayStat(k) || {}).done) { cur++; k = addDays(k, -1); }
-
-  let best = 0, run = 0, prev = null;
-  const keys = Object.keys(state.days).filter((x) => x <= today && dayStat(x) && dayStat(x).done).sort();
-  for (const x of keys) {
-    run = prev && diffDays(x, prev) === 1 ? run + 1 : 1;
-    best = Math.max(best, run);
-    prev = x;
-  }
-  return { cur, best };
-}
-
 function renderStats() {
   for (const b of $('seg').children) b.setAttribute('aria-selected', String(b.dataset.mode === ui.mode));
-
-  const st = streaks();
-  $('streak').innerHTML = `<b>${st.cur}</b>일 연속 완료<span class="best">최장 ${st.best}일</span>`;
 
   const { start, end } = range();
   $('period-label').textContent = periodLabel(start, end);
   $('next-period').disabled = addDays(end, 1) > today;
   if (ui.sel && (ui.sel < start || ui.sel > end)) ui.sel = null;
 
+  // 해낸 것만 센다: 끝낸 할 일 · 오늘 한 것(운동 · 공부 …)을 한 날 (연속 기록 · 완료율은 보여 주지 않는다 — 7-20)
   const s = summarize(start, end);
-  const rate = s.total ? Math.round((s.done / s.total) * 100) : null;
+  const to = end < today ? end : today;
   $('cards').innerHTML = [
-    ['완료', s.done, '개'],
-    ['완료율', rate === null ? '–' : rate, rate === null ? '' : '%'],
-    ['다 끝낸 날', s.perfect, '일'],
+    ['끝낸 일', s.done, '개'],
+    ...didItems().map((x) => [`${esc(x.label)}한 날`, didDays(x.id, start, to), '일']).filter(([, n]) => n).slice(0, 2), // 한 날이 있는 것만
   ].map(([l, v, u]) => `<div class="card"><div class="card-label">${l}</div><div class="card-value">${v}<small>${u}</small></div></div>`).join('');
 
   if (ui.mode === 'week') renderWeek(start);
@@ -108,6 +88,7 @@ function renderStats() {
     link.dataset.id = id;
     link.innerHTML = `<span>${reportName(id)}${ongoing ? ' <small>진행 중</small>' : ''}</span><span>보기 ›</span>`;
   }
+  renderHealthStats();
   renderBackup();
 }
 
@@ -136,7 +117,7 @@ function renderWeek(start) {
       <span class="wlab">${WD[d.getDay()]}<br>${d.getDate()}</span>
     </button>`;
   }).join('')}</div>`;
-  $('legend').innerHTML = '<span><i style="background:var(--accent)"></i>완료</span><span><i></i>못 한 일</span>';
+  $('legend').innerHTML = '<span><i style="background:var(--accent)"></i>끝낸 일</span><span><i></i>남은 일</span>';
 }
 
 function cellClass(k, base) {

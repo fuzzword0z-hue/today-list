@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
   <title>오늘</title>
 </head>
 <body>
@@ -316,6 +316,20 @@
       </form>
     </div>
 
+    <!-- ───────── 명상 1분 (늘 어두운 화면) ───────── -->
+    <div class="med" id="med" role="dialog" aria-modal="true" aria-labelledby="med-title" hidden>
+      <button type="button" class="med-close" id="med-close">그만하기</button>
+      <p class="med-title" id="med-title">1분</p>
+      <div class="med-circle" id="med-circle" aria-hidden="true"></div>
+      <p class="med-cue" id="med-cue" aria-live="polite">들이쉬고</p>
+      <p class="med-time" id="med-time">1:00</p>
+      <p class="med-tip" id="med-tip"></p>
+      <div class="med-done" id="med-done" hidden>
+        <p id="med-done-text">1분 했어요</p>
+        <button type="button" id="med-more">1분 더</button><button type="button" id="med-finish">마치기</button>
+      </div>
+    </div>
+
     <!-- 선택지 (반복 일정 수정·삭제 범위 등) -->
     <div class="sheet-wrap" id="choice" hidden>
       <div class="backdrop" data-close></div>
@@ -343,17 +357,18 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=26"></script>
-  <script src="js/events.js?v=26"></script>
-  <script src="js/today.js?v=26"></script>
-  <script src="js/calendar.js?v=26"></script>
-  <script src="js/stats.js?v=26"></script>
-  <script src="js/report.js?v=26"></script>
-  <script src="js/care.js?v=26"></script>
-  <script src="js/health.js?v=26"></script>
-  <script src="js/did.js?v=26"></script>
-  <script src="js/diary.js?v=26"></script>
-  <script src="js/backup.js?v=26"></script>
-  <script src="js/main.js?v=26"></script>
+  <script src="js/core.js?v=27"></script>
+  <script src="js/events.js?v=27"></script>
+  <script src="js/today.js?v=27"></script>
+  <script src="js/calendar.js?v=27"></script>
+  <script src="js/stats.js?v=27"></script>
+  <script src="js/report.js?v=27"></script>
+  <script src="js/care.js?v=27"></script>
+  <script src="js/health.js?v=27"></script>
+  <script src="js/did.js?v=27"></script>
+  <script src="js/med.js?v=27"></script>
+  <script src="js/diary.js?v=27"></script>
+  <script src="js/backup.js?v=27"></script>
+  <script src="js/main.js?v=27"></script>
 </body>
 </html>

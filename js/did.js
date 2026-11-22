@@ -41,11 +41,19 @@ function renderDid() {
       <span class="did-week">${week.length ? `${k >= weekStart(today) ? '이번 주' : '그 주'} ${week.map(([l, n]) => `${esc(l)} ${n}일`).join(' · ')}` : ''}</span>
       <button type="button" class="did-edit" data-did-edit="open" aria-label="항목 고치기">고치기</button></div>
     <div class="chips did-chips" role="group" aria-label="${k === today ? '오늘' : ml(k)} 한 것">${didItems().map((x) => `<button type="button" data-did="${x.id}" aria-pressed="${sel.includes(x.id)}">${esc(x.label)}</button>`).join('')}</div>
+    ${medRow(k)}
     ${week.length ? '' : '<p class="did-hint">5분도, 단어 10개도 누르면 \'했어요\'예요.</p>'}`;
 }
 
 $('did').addEventListener('click', (e) => {
   const k = ui.date;
+  // 명상 1분: 오늘은 타이머, 지난 날은 했어요/지우기 (js/med.js)
+  const mb = e.target.closest('[data-med]');
+  if (mb) {
+    if (k === today) openMed(mb.dataset.med);
+    else { markMed(k, mb.dataset.med, !medOf(k).includes(mb.dataset.med)); renderDid(); }
+    return;
+  }
   const b = e.target.closest('[data-did]');
   if (b) {
     const id = b.dataset.did;
@@ -53,6 +61,7 @@ $('did').addEventListener('click', (e) => {
     const on = !sel.includes(id);
     const nx = on ? [...sel, id] : sel.filter((x) => x !== id);
     if (nx.length) state.did[k] = nx; else delete state.did[k];
+    if (!on && id === state.medId) delete state.medi[k]; // 명상 체크를 지우면 그 날 아침 · 밤도 지운다
     save();
     if (on && navigator.vibrate) navigator.vibrate(8);
     renderDid();
@@ -68,7 +77,12 @@ $('did').addEventListener('click', (e) => {
       const t = inp.value.trim();
       const it = state.didItems.find((x) => x.id === id);
       if (it) { if (t) { it.label = t; delete it.off; } else it.off = 1; } // 지운 항목은 이름을 남겨 둔다
-      else if (t) state.didItems.push({ id: `c${Date.now().toString(36)}${inp.dataset.i}`, label: t });
+      else if (t) {
+        // 같은 이름이 이미 있으면 새로 만들지 않는다 (빼 둔 항목이면 다시 살려 지난 기록과 이어지게)
+        const same = state.didItems.find((x) => x.label === t);
+        if (same) delete same.off;
+        else state.didItems.push({ id: `c${Date.now().toString(36)}${inp.dataset.i}`, label: t });
+      }
     }
     save();
     toast('오늘 한 것 항목을 고쳤어요');

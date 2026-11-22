@@ -14,7 +14,8 @@
  *   seen: [ 'YYYY-MM' | 'YYYY' ],     열어 본 리포트
  *   lastExport: ms | undefined,       마지막으로 백업 파일을 내보낸 시각
  *   cond: { 'YYYY-MM-DD': { ap, en, vo, vl, st, w, n, th, night } }   고양이 컨디션 (js/care.js)
- *   did: { 'YYYY-MM-DD': [id] }, didItems: [{ id, label, off }]   오늘 한 것 (운동 · 공부 · 직접 더한 것, js/did.js)
+ *   did: { 'YYYY-MM-DD': [id] }, didItems: [{ id, label, off }]   오늘 한 것 (운동 · 공부 · 명상 · 직접 더한 것, js/did.js)
+ *   medi: { 'YYYY-MM-DD': ['am' | 'pm'] }, medId   명상 1분 (일어나서 · 자기 전, js/med.js)
  *   workout, workouts, study, studies   없앤 운동 · 공부 탭의 기록 (did로 옮겼고, 백업에 그대로 남긴다)
  *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   출근일 · 쉬는 날을 기본(매주 쉬는 요일)과 다르게 고른 날
  *   offDays: [요일]   매주 쉬는 요일 (0 = 일요일, 처음엔 [1] 월요일)
@@ -82,6 +83,12 @@ function normalize(s) {
       if (r && (r.review || r.min || r.a || r.b || (Array.isArray(r.rows) && r.rows.length))) mark(k, 'study');
     }
     s.didFrom = 1;
+  }
+  // 명상 1분(7-21): '오늘 한 것'에 명상 항목을 한 번 더한다. 이미 '명상'을 직접 더해 뒀으면 그 항목을 쓴다
+  s.medi = obj(s.medi) ? s.medi : {};
+  if (!s.medId) {
+    const own = s.didItems.find((x) => x.label.trim() === '명상');
+    if (own) { s.medId = own.id; delete own.off; } else { s.didItems.push({ id: 'med', label: '명상' }); s.medId = 'med'; }
   }
   s.daymode = obj(s.daymode) ? s.daymode : {};
   if (!Array.isArray(s.offDays) || !s.offDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) s.offDays = [1];

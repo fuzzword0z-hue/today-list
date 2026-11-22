@@ -124,7 +124,7 @@ function readBackup(text) {
   dropped += (s.events || []).length - events.length;
   kept += events.length;
   if (!kept && dropped) return null;
-  for (const f of ['cond', 'workouts', 'studies', 'health', 'weights', 'labs', 'daymode', 'diary', 'mind', 'sns', 'money']) {
+  for (const f of ['cond', 'workouts', 'studies', 'health', 'weights', 'labs', 'daymode', 'diary', 'mind', 'sns', 'money', 'did']) {
     if (s[f] && typeof s[f] === 'object' && !Array.isArray(s[f])) {
       const re = f === 'money' ? /^\d{4}-\d{2}$/ : DATE_RE; // 돈은 달마다
       for (const k in s[f]) if (!re.test(k)) delete s[f][k];
@@ -132,6 +132,7 @@ function readBackup(text) {
   }
   // 일기 탭 기록은 모양까지 확인 (망가진 값 하나로 화면이 멈추지 않게)
   for (const f of ['diary', 'mind', 'money']) if (s[f] && typeof s[f] === 'object') for (const k in s[f]) if (!s[f][k] || typeof s[f][k] !== 'object') delete s[f][k];
+  if (s.did && typeof s.did === 'object') for (const k in s.did) if (!Array.isArray(s.did[k])) delete s.did[k];
   if (s.sns && typeof s.sns === 'object') for (const k in s.sns) if (typeof s.sns[k] !== 'number') delete s.sns[k];
   return { data: normalize({ ...s, days, events }), exportedAt: j.exportedAt || null, dropped };
 }

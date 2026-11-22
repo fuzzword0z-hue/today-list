@@ -483,7 +483,7 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .tabs {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   height: calc(var(--tabh) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 1px solid var(--line);
@@ -1308,3 +1308,45 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .r-mind .r-dist li { word-break: keep-all; }
 .backup-size { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
 .backup-size.warn { color: var(--danger); font-weight: 600; }
+
+/* ───────── 오늘 한 것 (운동 · 공부 · 직접 더한 것, 누르면 '했어요') ───────── */
+.did { margin: 8px 0 4px; padding: 10px 12px 12px; background: var(--surface); border-radius: var(--radius); }
+.did-head { display: flex; align-items: center; gap: 8px; min-height: 32px; margin-bottom: 6px; }
+.did-title { flex: none; font-size: 15px; font-weight: 600; }
+.did-week { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-2); text-align: right; }
+.did-edit { flex: none; min-height: 32px; padding: 4px 8px; border-radius: 999px; font-size: 12.5px; color: var(--text-3); }
+.did-chips button { min-height: 40px; padding: 8px 16px; font-size: 14.5px; }
+.did-chips button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.did-chips button[aria-pressed="true"]::before { content: '✓ '; }
+.did-hint { margin: 8px 2px 0; font-size: 12px; color: var(--text-3); }
+
+/* 오늘 화면: 진료가 가까울 때만 (진료 수치 적기) */
+.h-alert { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; padding: 10px 12px; background: var(--c-me-soft); border-radius: var(--radius); }
+.h-alert[hidden] { display: none; }
+.h-alert-text { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--c-me-ink); }
+.h-alert-text small { display: block; font-size: 12px; font-weight: 400; color: var(--text-2); }
+.h-alert-btn { flex: none; min-height: 36px; padding: 6px 12px; border-radius: 999px; background: var(--c-me-ink); color: #fff; font-size: 13px; font-weight: 700; }
+
+/* 통계 탭: 내 건강 기록 */
+.hstats { margin-top: 18px; }
+.hs-card { margin-top: 8px; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.hs-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.hs-head b { font-size: 15px; }
+.hs-head span { font-size: 12px; color: var(--text-3); }
+.hs-one { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
+.hs-one small { margin-left: 6px; font-size: 13px; font-weight: 400; color: var(--text-3); }
+.hs-w-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.hs-w-row input[type="date"] { height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 15px; }
+.hs-save { min-height: 36px; padding: 6px 14px; border-radius: 999px; background: var(--c-me-soft); color: var(--c-me-ink); font-weight: 700; font-size: 13.5px; }
+.hs-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.hs-list button { min-height: 32px; padding: 4px 10px; border-radius: 999px; background: var(--bg); font-size: 12.5px; color: var(--text-2); }
+
+/* 일기: 오늘 해낸 것 한 줄 더 · 더 쓰고 싶을 때 (접힘) */
+.dy-more-line { min-height: 36px; margin-top: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--c-me-ink); }
+.dy-more { margin-bottom: 10px; }
+.dy-more > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-height: 44px; padding: 12px; border-radius: var(--radius); background: var(--surface); cursor: pointer; list-style: none; font-size: 15px; font-weight: 600; }
+.dy-more > summary::-webkit-details-marker { display: none; }
+.dy-more > summary::after { content: '▾'; margin-left: auto; color: var(--text-3); }
+.dy-more[open] > summary { margin-bottom: 10px; }
+.dy-more[open] > summary::after { content: '▴'; }
+.dy-more > summary small { font-size: 12px; font-weight: 400; color: var(--text-3); }

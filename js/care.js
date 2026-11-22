@@ -6,13 +6,19 @@
  *   구토는 한 번에 한 줄: vl = [{ t: 종류(VOMIT), at: 'HH:MM', b: 1 피 섞임, n: 메모 }]
  *     오늘 누르면 지금 시각으로 1회가 더해지고, 줄을 눌러 종류 · 시각 · 피 섞임 · 메모를 고친다 (지난 날은 시각 없이도 됨).
  *     하루에 거품 1 · 사료 1 · 위액 1처럼 섞여도, 같은 종류를 여러 번 해도 그대로 남고, 언제 토했는지가 진료에 단서가 된다.
- *   vo = '0' 오늘 안 토함 (확인했다는 기록). 예전 기록의 '1' · '2'(2회 이상)는 그대로 읽고, 그 날 새로 적으면 바뀐다. */
+ *   vo = '0' 오늘 안 토함 (확인했다는 기록). 예전 기록의 '1' · '2'(2회 이상)는 그대로 읽고, 그 날 새로 적으면 바뀐다.
+ *   night = 밤에 지켜봄: nausea 오심이 심해 토할까 봐 · vomit 구토 후 멈췄는지 확인 (예전 '늦게 잠 · 고양이 케어'에서 옮긴 것은 watch일 수 있다)
+ *     그 날 밤(새벽 4시 전까지)을 지켜본 기록. 진료 전 요약 · 리포트에 '밤에 지켜본 날'로 들어간다. */
 
 const COND = [
   { f: 'ap', label: '식욕', opts: [['good', '잘 먹음'], ['normal', '보통'], ['low', '적게'], ['none', '안 먹음']], bad: ['low', 'none'] },
   { f: 'en', label: '활력', opts: [['good', '좋음'], ['normal', '보통'], ['low', '처짐']], bad: ['low'] },
   { f: 'st', label: '배변', opts: [['normal', '정상'], ['loose', '묽음·설사'], ['hard', '변비']], bad: ['loose', 'hard'] },
 ];
+const NIGHT = [['nausea', '오심 지켜봄'], ['vomit', '구토 후 확인']];
+const nightOf = (c) => (c && Array.isArray(c.night) ? c.night : []);
+/* 아픈 고양이를 밤에 지켜본 날 */
+const catNight = (d) => nightOf(condOf(d)).length > 0;
 const VOMIT = [['foam', '거품'], ['food', '사료'], ['bile', '위액'], ['hair', '헤어볼'], ['med', '약 직후'], ['etc', '기타']];
 const PAW_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="16" rx="4.6" ry="3.6"/><circle cx="6" cy="10.5" r="1.8"/><circle cx="9.6" cy="6.6" r="1.8"/><circle cx="14.4" cy="6.6" r="1.8"/><circle cx="18" cy="10.5" r="1.8"/></svg>';
 const PROMPT_DAYS = 3; // 오늘 화면에서 체크가 빠진 케어를 물어보는 기간 (어제부터 며칠 전까지)
@@ -53,6 +59,7 @@ function condSummary(c, withTh = true) {
   if (!c) return '';
   const bad = [vomitText(c), ...COND.filter((x) => c[x.f] && isBad(x.f, c[x.f])).map((x) => `${x.label} ${optLabel(x.f, c[x.f])}`)].filter(Boolean);
   const recorded = COND.some((x) => c[x.f]) || c.vo === '0' || vomited(c);
+  if (nightOf(c).length) bad.push('밤에 지켜봄');
   const parts = bad.length ? bad : recorded ? ['특이 사항 없음'] : [];
   if (c.w) parts.push(fmtKg(c.w));
   if (c.th && withTh) parts.push('양치 ✓');
@@ -198,6 +205,9 @@ function renderCond() {
         ${x.opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${!!c && c[x.f] === v}" class="${x.bad.includes(v) ? 'bad' : ''}">${l}</button>`).join('')}
       </div></div>`).join('')}
       ${vomitRow(k, c)}
+      <div class="cond-row"><span class="cond-label">밤</span><div class="chips" data-night role="group" aria-label="밤에 지켜봄">
+        ${NIGHT.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${nightOf(c).includes(v)}">${l}</button>`).join('')}</div></div>
+      ${nightOf(c).includes('vomit') && !vomited(c) ? '<p class="vo-note">토한 것도 위에 적어 두면 진료 때 도움이 돼요.</p>' : ''}
       <div class="cond-row"><span class="cond-label">체중</span>
         <input class="cond-w" id="cond-w" aria-label="고양이 체중" type="number" inputmode="decimal" step="0.01" min="0" max="30" placeholder="0.00" value="${c && c.w ? c.w : ''}"><span class="cond-unit">kg</span>
         ${lastWeight(k) ? `<span class="cond-prev">지난 ${fmtKg(lastWeight(k).w)} (${ml(lastWeight(k).k)})</span>` : ''}
@@ -279,6 +289,16 @@ $('cond').addEventListener('click', (e) => {
   }
   const vi = e.target.closest('[data-vi]');
   if (vi) { openVomit(ui.date, +vi.dataset.vi); return; }
+  // 밤에 지켜봄 (여러 개)
+  const nb = e.target.closest('[data-night] [data-v]');
+  if (nb) {
+    const cur = nightOf(condOf(ui.date));
+    const v = nb.dataset.v;
+    const nx = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur.filter((x) => x !== 'watch'), v];
+    setCond(ui.date, 'night', nx.length ? nx : null);
+    renderCond();
+    return;
+  }
   const b = e.target.closest('.chips [data-v]');
   if (!b) return;
   const f = b.parentElement.dataset.f;
@@ -402,9 +422,9 @@ function careSummaryData() {
   const weights = recs.filter(([, r]) => r.w).map(([k, r]) => ({ k, w: r.w }));
   const notes = recs.filter(([, r]) => r.n).map(([k, r]) => ({ k, n: r.n }));
   const teeth = recs.filter(([, r]) => r.th).length;
-  // 밤에 지켜본 날: 오심이 심해 토할까 봐, 구토 후 멈췄는지 보느라 늦게 잔 밤 (내 건강 카드의 '늦게 잠 · 고양이 케어')
+  // 밤에 지켜본 날: 오심이 심해 토할까 봐, 구토 후 멈췄는지 보느라 늦게 잔 밤 (고양이 컨디션의 '밤에 지켜봄')
   const watch = [];
-  for (let k = from; k <= to; k = addDays(k, 1)) if (catNight(k)) watch.push({ k, why: state.health[k].lateCat || [] });
+  for (let k = from; k <= to; k = addDays(k, 1)) if (catNight(k)) watch.push({ k, why: nightOf(condOf(k)).filter((w) => w !== 'watch') });
   return { last, next, from, to, days, doses, recs, ap: count('ap'), en: count('en'), st: count('st'), vomit, weights, notes, teeth, watch };
 }
 

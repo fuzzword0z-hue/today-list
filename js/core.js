@@ -13,20 +13,24 @@
  *   dismissed: 'YYYY-MM-DD' | null,   '못 끝낸 일' 배너를 닫은 날
  *   seen: [ 'YYYY-MM' | 'YYYY' ],     열어 본 리포트
  *   lastExport: ms | undefined,       마지막으로 백업 파일을 내보낸 시각
- *   cond: { 'YYYY-MM-DD': { ap, en, vo, st, w, n } }   고양이 컨디션 (js/care.js)
- *   workout, workouts                 운동 체크 상태와 '오늘 운동 완료' 기록 (js/workout.js)
- *   study, studies                    공부 탭에 적어 둔 내용과 '오늘 공부 완료' 기록 (js/study.js)
+ *   cond: { 'YYYY-MM-DD': { ap, en, vo, vl, st, w, n, th, night } }   고양이 컨디션 (js/care.js)
+ *   did: { 'YYYY-MM-DD': [id] }, didItems: [{ id, label, off }]   오늘 한 것 (운동 · 공부 · 직접 더한 것, js/did.js)
+ *   workout, workouts, study, studies   없앤 운동 · 공부 탭의 기록 (did로 옮겼고, 백업에 그대로 남긴다)
  *   daymode: { 'YYYY-MM-DD': 'weekday' | 'weekend' }   출근일 · 쉬는 날을 기본(매주 쉬는 요일)과 다르게 고른 날
  *   offDays: [요일]   매주 쉬는 요일 (0 = 일요일, 처음엔 [1] 월요일)
- *   health, hgoal, hstart, weights, labs  내 건강: 안 지킨 날 체크, 주 목표, 체중, 진료 검사 수치 (js/health.js)
+ *   weights, labs                     내 체중 · 진료 검사 수치 (js/health.js)
+ *   health, hgoal, hstart             없앤 '안 지킨 것' 체크와 주 목표 (백업에 그대로 남긴다)
  *   diary: { 'YYYY-MM-DD': { t, at } }   감사일기 (js/diary.js)
- *   mind, compass, compassHide, feelCustom, fillCustom, sns, money  일기 탭의 나머지: 인정한 3가지 · 마음 이름 · 질문 · 나를 채우는 시간 ·
- *                                     흔들린 순간, 나침반 문장, 주간 SNS 시간, 월 지출·비상금 (js/diary.js)
+ *   mind, compass, compassHide, feelCustom, fillCustom  일기 탭의 나머지: 오늘 해낸 것 · 마음 이름 · 질문 · 나를 채우는 시간 ·
+ *                                     흔들린 순간, 나침반 문장 (js/diary.js)
+ *   sns, money                        없앤 '나를 지키는 환경' 칸 (백업에 그대로 남긴다)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
  */
 const STORE = 'today-list:v1';
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
+/* 오늘 한 것: 기본 항목 (오늘 화면에서 고치고 더할 수 있다) */
+const DID_DEFAULT = [{ id: 'ex', label: '운동' }, { id: 'study', label: '공부' }];
 /* 일기 탭 맨 위 나침반: 내가 지향하는 문장 (일기 탭에서 고칠 수 있다) */
 const COMPASS_DEFAULT = [
   '내가 선택한 것에 내가 책임지는 어른이 되자',
@@ -63,6 +67,22 @@ function normalize(s) {
     delete s.study.a;
     delete s.study.b;
   }
+  // 운동 · 공부 탭을 없애며(7-20) 그 기록을 '오늘 한 것'의 한 날로 옮긴다 (한 번만 — 그 뒤 지운 체크가 되살아나지 않게)
+  s.did = obj(s.did) ? s.did : {};
+  s.didItems = Array.isArray(s.didItems) && s.didItems.every((x) => obj(x) && typeof x.id === 'string' && typeof x.label === 'string')
+    ? s.didItems : DID_DEFAULT.map((x) => ({ ...x }));
+  if (!s.didFrom) {
+    const mark = (k, id) => { s.did[k] = [...new Set([...(Array.isArray(s.did[k]) ? s.did[k] : []), id])]; };
+    for (const k in s.workouts) {
+      const r = s.workouts[k];
+      if (r && (r.ex20 || r.bike || r.sq || r.full || (Array.isArray(r.rows) && r.rows.length) || ['back', 'shoulder', 'plank', 'side'].some((f) => r[f]))) mark(k, 'ex');
+    }
+    for (const k in s.studies) {
+      const r = s.studies[k];
+      if (r && (r.review || r.min || r.a || r.b || (Array.isArray(r.rows) && r.rows.length))) mark(k, 'study');
+    }
+    s.didFrom = 1;
+  }
   s.daymode = obj(s.daymode) ? s.daymode : {};
   if (!Array.isArray(s.offDays) || !s.offDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) s.offDays = [1];
   s.health = obj(s.health) ? s.health : {};
@@ -74,6 +94,17 @@ function normalize(s) {
     if (h.snackNote !== undefined && typeof h.snackNote !== 'string') delete h.snackNote;
   }
   s.hgoal = obj(s.hgoal) ? s.hgoal : {};
+  // 고양이를 지켜본 밤(늦게 잠 · 고양이 케어)은 고양이 컨디션의 '밤에 지켜봄'으로 옮긴다 (한 번만)
+  if (!s.nightFrom) {
+    for (const d in s.health) {
+      const h = s.health[d];
+      if (!h || !h.late || !(Array.isArray(h.lateWhy) ? h.lateWhy : [h.lateWhy]).includes('cat')) continue;
+      const why = Array.isArray(h.lateCat) && h.lateCat.length ? h.lateCat : ['watch'];
+      const c = obj(s.cond[d]) ? s.cond[d] : {};
+      s.cond[d] = { ...c, night: [...new Set([...(Array.isArray(c.night) ? c.night : []), ...why])] };
+    }
+    s.nightFrom = 1;
+  }
   s.weights = obj(s.weights) ? s.weights : {};
   s.labs = obj(s.labs) ? s.labs : {};
   s.diary = obj(s.diary) ? s.diary : {};
@@ -90,8 +121,6 @@ function normalize(s) {
   s.compassHide = !!s.compassHide;
   s.feelCustom = Array.isArray(s.feelCustom) ? s.feelCustom.filter((t) => typeof t === 'string' && t.trim()).slice(0, 12) : [];
   s.fillCustom = Array.isArray(s.fillCustom) ? s.fillCustom.filter((t) => typeof t === 'string' && t.trim()).slice(0, 8) : [];
-  s.sns = obj(s.sns) ? s.sns : {};
-  s.money = obj(s.money) ? s.money : {};
   if (s.dismissed === undefined) s.dismissed = null;
   return s;
 }
@@ -214,6 +243,24 @@ const mdw = (k) => `${md(k)} (${WD[parse(k).getDay()]})`;
 const monthStart = (k) => { const d = parse(k); return keyOf(new Date(d.getFullYear(), d.getMonth(), 1)); };
 const monthEnd = (k) => { const d = parse(k); return keyOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const weekStart = (k) => addDays(k, -parse(k).getDay()); // 일요일
+const addMonths = (k, n) => {
+  const d = parse(k);
+  const r = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  r.setDate(Math.min(d.getDate(), new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate()));
+  return keyOf(r);
+};
+const hm = (t) => t.replace(/^0(?=\d)/, ''); // 07:00 → 7:00
+
+/* 출근일(weekday) · 쉬는 날(weekend): 기본은 매주 쉬는 요일. 다르게 고른 날만 state.daymode에 남긴다 (캘린더 '쉬는 날 고르기') */
+const offDays = () => (Array.isArray(state.offDays) ? state.offDays : [1]); // 0 = 일요일
+const defaultMode = (k) => (offDays().includes(parse(k).getDay()) ? 'weekend' : 'weekday');
+const dayMode = (k) => state.daymode[k] || defaultMode(k);
+function setDayMode(k, mode) {
+  if (mode === defaultMode(k)) delete state.daymode[k];
+  else state.daymode[k] = mode;
+  save();
+}
 
 /* 오늘 기준 상대 표현: 오늘 / 내일 / 모레 / 어제 / N일 후 */
 function relDay(k) {
@@ -241,14 +288,13 @@ const ui = {
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const pct = (x) => Math.round(x * 100);
 
 const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 /* ───────── 화면 전환 ─────────
  * 탭(오늘·캘린더·통계)은 기록을 남기지 않고 바꾸고(replace),
  * 리포트처럼 '들어가는' 화면만 기록을 남겨(push) 안드로이드 뒤로 가기로 돌아올 수 있게 한다. */
-const VIEWS = ['today', 'cal', 'workout', 'study', 'diary', 'stats', 'report'];
+const VIEWS = ['today', 'cal', 'diary', 'stats', 'report'];
 
 function route() {
   const h = location.hash.slice(1);
@@ -293,8 +339,6 @@ function renderView() {
   $('stats-badge').hidden = dueReports().length === 0;
   if (r.view === 'today') renderToday();
   else if (r.view === 'cal') renderCal();
-  else if (r.view === 'workout') renderWorkout();
-  else if (r.view === 'study') renderStudy();
   else if (r.view === 'diary') renderDiary();
   else if (r.view === 'stats') renderStats();
   else renderReport(r.id);
@@ -348,54 +392,13 @@ function choose(title, options) {
   });
 }
 
-/* ───────── 운동·공부 탭 위 '기록 날짜' 줄 ─────────
- * 지난 날 기록을 새로 쓰거나 고칠 때 날짜를 고른다 (미래 날짜는 고를 수 없음) */
-function recDateRow(k) {
-  const past = k !== today;
-  return `<div class="rec-date${past ? ' past' : ''}">
-    <label class="rd-btn"><span class="rd-label">기록 날짜</span><b>${mdw(k)}${past ? '' : ' · 오늘'}</b>
-      <svg class="rd-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      <input type="date" class="rd-input" value="${k}" max="${today}" aria-label="기록 날짜 고르기"></label>
-    ${past ? '<button class="pill rd-today" data-rd-today>오늘로</button>' : ''}
-  </div>`;
-}
-
-function bindRecDate(el, onPick) {
-  el.addEventListener('click', (e) => {
-    if (e.target.closest('[data-rd-today]')) { onPick(today); return; }
-    // 데스크톱 크롬은 날짜 칸을 눌러도 달력이 안 열려서 직접 연다
-    if (e.target.classList.contains('rd-input') && e.target.showPicker) {
-      try { e.target.showPicker(); } catch (err) { /* 이미 열려 있음 */ }
-    }
-  });
-  el.addEventListener('change', (e) => {
-    if (!e.target.classList.contains('rd-input')) return;
-    const v = e.target.value;
-    if (v && v <= today) onPick(v);
-    else { toast('오늘이나 지난 날짜만 고를 수 있어요'); render(); }
-  });
-}
-
-/* ───────── 시간 줄 [시작 ~ 끝 + 내용] (공부 탭, 운동 탭의 쉬는 날·그 밖의 운동) ─────────
- * 내용 칸은 쓰는 만큼 늘어난다 */
-/* [시작 ~ 끝 + 내용] 한 줄 (공부 · 운동). 끝이 시작보다 한참 이르면 시간을 확인하라고 알려 준다 (rowBad) */
-function timeRowHtml(r, i, ro, ph) {
-  return `<div class="st-row${rowBad(r) ? ' bad' : ''}" data-i="${i}">
-  <input type="time" class="st-time" data-f="s" value="${r.s || ''}" aria-label="${i + 1}번째 시작 시간"${ro}>
-  <span class="st-tilde">~</span>
-  <input type="time" class="st-time" data-f="e" value="${r.e || ''}" aria-label="${i + 1}번째 끝 시간"${ro}>
-  <p class="st-warn" role="status">끝 시각이 시작보다 빨라요. 오전·오후를 확인해 주세요 (0분으로 세요)</p>
-  <textarea class="st-row-text" data-f="t" rows="1" maxlength="300" placeholder="${ph}" aria-label="${i + 1}번째 내용"${ro}>${esc(r.t || '')}</textarea>
-</div>`;
-}
+/* 쓰는 만큼 늘어나는 글 칸 */
 function growText(el) {
   el.style.height = 'auto';
   // 비어 있으면 한 줄 (긴 안내 글씨 때문에 커지지 않게)
   if (el.value && el.scrollHeight) el.style.height = `${el.scrollHeight + 2}px`;
   else el.style.height = '';
 }
-const growAll = (root) => { for (const t of root.querySelectorAll('textarea.st-row-text')) growText(t); };
-document.addEventListener('input', (e) => { if (e.target.matches('textarea.st-row-text')) growText(e.target); });
 
 /* 키보드로도 누를 수 있게: role="button"인 목록 줄에서 Enter·Space = 누르기 */
 document.addEventListener('keydown', (e) => {

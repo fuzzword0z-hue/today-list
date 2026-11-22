@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
   <title>오늘</title>
 </head>
 <body>
@@ -52,9 +52,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
+        <div class="h-alert" id="health" hidden></div>
         <ul class="ev-list" id="today-events"></ul>
+        <div class="did" id="did" hidden></div>
         <div class="cond" id="cond" hidden></div>
-        <div class="cond health" id="health" hidden></div>
         <ul class="list" id="list"></ul>
         <div class="empty" id="empty" hidden>
           <p class="empty-title">할 일을 적어 보세요</p>
@@ -112,7 +113,6 @@
       </header>
 
       <main class="scroll stats">
-        <div class="streak" id="streak"></div>
 
         <div class="period">
           <button class="icon-btn" id="prev-period" aria-label="이전 기간">
@@ -129,6 +129,8 @@
         <div class="legend" id="legend"></div>
         <div class="detail" id="detail"></div>
         <button class="report-link" id="report-link" hidden></button>
+
+        <section class="hstats" id="hstats"></section>
 
         <section class="backup" id="backup">
           <h2 class="sub-head">백업</h2>
@@ -160,63 +162,7 @@
       <main class="scroll report" id="report"></main>
     </section>
 
-    <!-- ───────── 운동 ───────── -->
-    <section class="view" id="view-workout" hidden>
-      <header class="top">
-        <div class="top-row">
-          <span class="date-sub is-today" id="wo-date"></span>
-          <span class="spacer"></span>
-          <div class="mini-seg" id="wo-mode" role="radiogroup" aria-label="출근일·쉬는 날">
-            <button role="radio" data-mode="weekday">출근일</button>
-            <button role="radio" data-mode="weekend">쉬는 날</button>
-          </div>
-        </div>
-        <div class="top-row">
-          <h1 class="date-main">운동</h1>
-          <span class="spacer"></span>
-          <span class="wo-total" id="wo-total"></span>
-        </div>
-      </header>
-      <main class="scroll" id="wo-scroll">
-        <div id="wo-recdate"></div>
-        <div id="wo-status"></div>
-        <div id="wo-routine"></div>
-        <div id="wo-list"></div>
-        <p class="wo-note">칸을 누르면 그 칸까지 채워지고, 마지막 칸을 한 번 더 누르면 하나 빠져요.<br>완료 기록은 캘린더에 나오지 않고 월간·연간 리포트에만 반영돼요.</p>
-      </main>
-      <div class="wo-actions">
-        <button class="wo-btn" id="wo-reset">전체 지우기</button>
-        <button class="wo-btn primary" id="wo-done">오늘 운동 완료</button>
-      </div>
-    </section>
-
-    <!-- ───────── 공부 ───────── -->
-    <section class="view" id="view-study" hidden>
-      <header class="top">
-        <div class="top-row">
-          <span class="date-sub is-today" id="st-date"></span>
-          <span class="spacer"></span>
-          <div class="mini-seg" id="st-mode" role="radiogroup" aria-label="출근일·쉬는 날">
-            <button role="radio" data-mode="weekday">출근일</button>
-            <button role="radio" data-mode="weekend">쉬는 날</button>
-          </div>
-        </div>
-        <div class="top-row"><h1 class="date-main">공부</h1></div>
-        <div class="st-exams" id="st-exams" hidden></div>
-      </header>
-      <main class="scroll" id="st-scroll">
-        <div id="st-recdate"></div>
-        <div id="st-status"></div>
-        <div id="st-body"></div>
-        <p class="wo-note">휴무·연차인 날은 위에서 '쉬는 날'로 바꾸거나, 캘린더의 '쉬는 날 고르기'에서 근무표대로 한 번에 골라요. 운동 탭도 같이 바뀌어요.<br>완료 기록은 월간·연간 리포트에만 반영돼요.</p>
-      </main>
-      <div class="wo-actions">
-        <button class="wo-btn" id="st-reset">전체 지우기</button>
-        <button class="wo-btn primary" id="st-done">오늘 공부 완료</button>
-      </div>
-    </section>
-
-    <!-- ───────── 감사일기 ───────── -->
+    <!-- ───────── 일기 ───────── -->
     <section class="view" id="view-diary" hidden>
       <header class="top">
         <div class="top-row">
@@ -242,11 +188,13 @@
           <p class="dy-status" id="dy-status"></p>
         </section>
         <section class="wo-card dy-sec" id="dy-feel"></section>
-        <section class="wo-card dy-sec" id="dy-q"></section>
-        <section class="wo-card dy-sec" id="dy-fill"></section>
-        <section class="wo-card dy-sec" id="dy-shake"></section>
+        <details class="dy-more" id="dy-more">
+          <summary>더 쓰고 싶을 때 <small>오늘의 질문 · 나를 채우는 시간 · 흔들린 순간</small></summary>
+          <section class="wo-card dy-sec" id="dy-q"></section>
+          <section class="wo-card dy-sec" id="dy-fill"></section>
+          <section class="wo-card dy-sec" id="dy-shake"></section>
+        </details>
         <section class="wo-card dy-month" id="dy-month"></section>
-        <details class="wo-card dy-env" id="dy-env"></details>
         <p class="wo-note">점수도 연속 기록도 없어요. 쓰지 못한 날이 있어도 다시 돌아오면 충분해요.<br>일기는 이 휴대폰에만 저장되고, 통계 탭의 백업 파일(내보내기)에 함께 담겨요.<br>한 달 쓴 뒤 '이번 달 일기 복사'로 채팅에 붙여 넣으면 피드백을 받을 수 있어요.</p>
       </main>
     </section>
@@ -260,14 +208,6 @@
       <button data-tab="cal">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
         <span>캘린더</span>
-      </button>
-      <button data-tab="workout">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg>
-        <span>운동</span>
-      </button>
-      <button data-tab="study">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23"/><path d="M4 20.5V5.5M8 7h8M8 10.5h6"/></svg>
-        <span>공부</span>
       </button>
       <button data-tab="diary">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h11.5A2.5 2.5 0 0 1 19 7v12.5H7.5A2.5 2.5 0 0 1 5 17z"/><path d="M12 15.2s-3-1.9-3-4a1.6 1.6 0 0 1 3-.9 1.6 1.6 0 0 1 3 .9c0 2.1-3 4-3 4z"/></svg>
@@ -403,18 +343,17 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=25"></script>
-  <script src="js/events.js?v=25"></script>
-  <script src="js/today.js?v=25"></script>
-  <script src="js/calendar.js?v=25"></script>
-  <script src="js/stats.js?v=25"></script>
-  <script src="js/report.js?v=25"></script>
-  <script src="js/care.js?v=25"></script>
-  <script src="js/workout.js?v=25"></script>
-  <script src="js/study.js?v=25"></script>
-  <script src="js/health.js?v=25"></script>
-  <script src="js/diary.js?v=25"></script>
-  <script src="js/backup.js?v=25"></script>
-  <script src="js/main.js?v=25"></script>
+  <script src="js/core.js?v=26"></script>
+  <script src="js/events.js?v=26"></script>
+  <script src="js/today.js?v=26"></script>
+  <script src="js/calendar.js?v=26"></script>
+  <script src="js/stats.js?v=26"></script>
+  <script src="js/report.js?v=26"></script>
+  <script src="js/care.js?v=26"></script>
+  <script src="js/health.js?v=26"></script>
+  <script src="js/did.js?v=26"></script>
+  <script src="js/diary.js?v=26"></script>
+  <script src="js/backup.js?v=26"></script>
+  <script src="js/main.js?v=26"></script>
 </body>
 </html>

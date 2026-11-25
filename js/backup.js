@@ -130,7 +130,7 @@ function readBackup(text) {
       for (const k in s[f]) if (!re.test(k)) delete s[f][k];
     }
   }
-  // 일기 탭 기록은 모양까지 확인 (망가진 값 하나로 화면이 멈추지 않게)
+  // 일기 탭 기록은 모양까지 확인 (망가진 값 하나로 화면이 멈추지 않게). 가계부(budget)는 normalize가 모양을 확인한다
   for (const f of ['diary', 'mind', 'money']) if (s[f] && typeof s[f] === 'object') for (const k in s[f]) if (!s[f][k] || typeof s[f][k] !== 'object') delete s[f][k];
   for (const f of ['did', 'medi']) if (s[f] && typeof s[f] === 'object') for (const k in s[f]) if (!Array.isArray(s[f][k])) delete s[f][k];
   if (s.sns && typeof s.sns === 'object') for (const k in s.sns) if (typeof s.sns[k] !== 'number') delete s.sns[k];

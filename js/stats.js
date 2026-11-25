@@ -58,6 +58,13 @@ function summarize(start, end) {
 }
 
 function renderStats() {
+  // 위 두 칸: [기록] 캘린더 · 일기 통계 / [가계부] 급여일에 적는 표 (js/budget.js). 백업은 둘 다 맨 아래에
+  const money = ui.statsTab === 'money';
+  for (const b of $('stats-tabs').children) b.setAttribute('aria-selected', String(b.dataset.stab === (money ? 'money' : 'rec')));
+  $('seg').hidden = money;
+  $('stats-rec').hidden = money;
+  $('budget').hidden = !money;
+  if (money) { renderBudget(); renderBackup(); return; }
   for (const b of $('seg').children) b.setAttribute('aria-selected', String(b.dataset.mode === ui.mode));
 
   const { start, end } = range();
@@ -284,6 +291,15 @@ $('chart').addEventListener('click', (e) => {
   if (!b) return;
   ui.sel = ui.sel === b.dataset.k ? null : b.dataset.k;
   renderStats();
+});
+
+$('stats-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-stab]');
+  if (!b || b.dataset.stab === ui.statsTab) return;
+  ui.statsTab = b.dataset.stab;
+  if (ui.statsTab === 'money') ui.budgetMonth = cycleMonth();
+  renderStats();
+  $('view-stats').querySelector('.scroll').scrollTop = 0;
 });
 
 $('seg').addEventListener('click', (e) => {

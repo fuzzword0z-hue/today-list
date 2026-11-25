@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=29">
   <title>오늘</title>
 </head>
 <body>
@@ -44,6 +44,7 @@
 
       <main class="scroll" id="today-scroll">
         <div id="report-banners"></div>
+        <div id="budget-banner"></div>
         <div id="care-prompts"></div>
         <div class="banner" id="carry" hidden>
           <span class="banner-text" id="carry-text"></span>
@@ -105,6 +106,10 @@
         <div class="top-row">
           <h1 class="date-main">통계</h1>
         </div>
+        <div class="seg seg2" role="tablist" id="stats-tabs" aria-label="통계 보기">
+          <button role="tab" data-stab="rec">기록</button>
+          <button role="tab" data-stab="money">가계부</button>
+        </div>
         <div class="seg" role="tablist" id="seg">
           <button role="tab" data-mode="week">주</button>
           <button role="tab" data-mode="month">월</button>
@@ -114,6 +119,7 @@
 
       <main class="scroll stats">
 
+        <div id="stats-rec">
         <div class="period">
           <button class="icon-btn" id="prev-period" aria-label="이전 기간">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
@@ -125,12 +131,16 @@
         </div>
 
         <div class="cards" id="cards"></div>
+        <section class="habits" id="habits"></section>
         <div class="chart" id="chart"></div>
         <div class="legend" id="legend"></div>
         <div class="detail" id="detail"></div>
         <button class="report-link" id="report-link" hidden></button>
 
         <section class="hstats" id="hstats"></section>
+        </div>
+
+        <section class="budget" id="budget" hidden></section>
 
         <section class="backup" id="backup">
           <h2 class="sub-head">백업</h2>
@@ -357,18 +367,19 @@
     </div>
   </div>
 
-  <script src="js/core.js?v=27"></script>
-  <script src="js/events.js?v=27"></script>
-  <script src="js/today.js?v=27"></script>
-  <script src="js/calendar.js?v=27"></script>
-  <script src="js/stats.js?v=27"></script>
-  <script src="js/report.js?v=27"></script>
-  <script src="js/care.js?v=27"></script>
-  <script src="js/health.js?v=27"></script>
-  <script src="js/did.js?v=27"></script>
-  <script src="js/med.js?v=27"></script>
-  <script src="js/diary.js?v=27"></script>
-  <script src="js/backup.js?v=27"></script>
-  <script src="js/main.js?v=27"></script>
+  <script src="js/core.js?v=29"></script>
+  <script src="js/events.js?v=29"></script>
+  <script src="js/today.js?v=29"></script>
+  <script src="js/calendar.js?v=29"></script>
+  <script src="js/stats.js?v=29"></script>
+  <script src="js/report.js?v=29"></script>
+  <script src="js/care.js?v=29"></script>
+  <script src="js/health.js?v=29"></script>
+  <script src="js/did.js?v=29"></script>
+  <script src="js/med.js?v=29"></script>
+  <script src="js/budget.js?v=29"></script>
+  <script src="js/diary.js?v=29"></script>
+  <script src="js/backup.js?v=29"></script>
+  <script src="js/main.js?v=29"></script>
 </body>
 </html>

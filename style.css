@@ -1373,3 +1373,81 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .med-done p { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
 .med-done button { min-height: 44px; margin: 0 4px; padding: 10px 18px; border-radius: 999px; background: #1d2230; color: #e6e6ee; font-size: 15px; font-weight: 600; }
 .med-done #med-finish { background: #7eaaff; color: #0d0f14; }
+
+/* ───────── 통계: 습관 트래커 (한 날만 채운다) ───────── */
+.habits { margin: -8px 0 20px; }
+.habits .sub-head { margin-top: 0; }
+.habits .sub-head small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--text-3); }
+.habits-grid { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.hb-row { display: flex; align-items: center; gap: 6px; }
+.hb-lab { flex: none; width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
+.hb-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; }
+.habits-grid.week .hb-grid, .habits-grid.year .hb-grid { gap: 4px; }
+.hb-head .hb-grid span { overflow: visible; white-space: nowrap; text-align: center; font-size: 10px; color: var(--text-3); }
+.hb-sum { flex: none; width: 24px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.hb-head .hb-sum { font-size: 10px; font-weight: 400; color: var(--text-3); }
+.hb-cell { display: block; aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 3px; background: var(--track); }
+.habits-grid.week .hb-cell { border-radius: 8px; }
+.hb-cell.on { background: var(--accent); }
+.hb-cell.am { background: linear-gradient(var(--accent) 50%, var(--track) 50%); }
+.hb-cell.pm { background: linear-gradient(var(--track) 50%, var(--accent) 50%); }
+.hb-cell.future { opacity: .4; }
+.hb-cell.today { box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.hb-cell.sel { box-shadow: 0 0 0 1.5px var(--text); }
+.hb-mcell { aspect-ratio: 1; min-width: 0; padding: 0; border-radius: 6px; background: var(--track); font-size: 11px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.hb-mcell.future { opacity: .4; }
+.hb-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 8px 4px 0; font-size: 11.5px; color: var(--text-3); }
+.hb-legend .hb-cell { width: 10px; }
+.hb-notes { margin: 8px 4px 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.hb-mcell.lv1 { background: var(--lv1); color: var(--lv-ink-1); }
+.hb-mcell.lv2 { background: var(--lv2); color: var(--lv-ink-2); }
+.hb-mcell.lv3 { background: var(--lv3); color: var(--lv-ink-3); }
+.hb-mcell.lv4 { background: var(--lv4); color: var(--lv-ink-4); }
+
+/* ───────── 통계: [기록] [가계부] 두 칸 · 가계부 (급여일에 한 번 적고 흐름을 본다) ───────── */
+.seg.seg2 { grid-template-columns: repeat(2, 1fr); }
+.seg2 + .seg { margin-top: 8px; }
+.budget .period-label { display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+.budget .period-label small { font-size: 12px; font-weight: 400; color: var(--text-3); }
+.b-card { margin-top: 10px; padding: 12px; background: var(--surface); border-radius: var(--radius); }
+.b-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.b-head b { font-size: 15px; }
+.b-sum { margin-left: auto; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.b-row { display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--line); }
+.b-head + .b-row, .b-head + .b-sub + .b-row { border-top: 0; }
+.b-lab { flex: 1; min-width: 0; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.b-lab small { display: block; font-size: 11.5px; color: var(--text-3); }
+.b-in { flex: none; width: 116px; height: 38px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; text-align: right; font-variant-numeric: tabular-nums; }
+.b-in::placeholder { color: var(--text-3); }
+.b-row.fixed .b-in { color: var(--text-2); border-style: dashed; }
+.b-unit { flex: none; font-size: 13px; color: var(--text-3); }
+.b-sub { margin: 6px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
+.b-compare { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); font-size: 13px; line-height: 1.55; color: var(--text-2); }
+.b-compare b { color: var(--text); font-variant-numeric: tabular-nums; }
+.b-left-card .b-head { margin-bottom: 0; }
+.b-left { margin-left: auto; font-size: 22px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.b-ro-v { flex: none; padding-right: 2px; font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.b-inst { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
+.b-head + .b-inst { border-top: 0; }
+.b-inst > span { flex: 1; min-width: 160px; color: var(--text-2); }
+.b-inst b { color: var(--text); }
+.b-mini { flex: none; min-height: 36px; padding: 4px 12px; border-radius: 999px; background: var(--bg); font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.b-mini.strong { background: var(--accent-soft); color: var(--accent); }
+.b-add { display: block; width: 100%; min-height: 44px; margin-top: 8px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--accent); }
+.b-inst-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.b-inst-form .b-text { flex: 1 1 100%; }
+.b-inst-form .b-in { flex: 1; width: auto; min-width: 100px; }
+.b-inst-form select { height: 38px; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 15px; }
+.b-text { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+.b-memo { display: block; width: 100%; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; resize: none; }
+.b-flow { display: grid; grid-template-columns: 2.6em repeat(4, minmax(0, 1fr)); margin-top: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.b-flow > * { padding: 7px 0 7px 6px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.b-flow > :nth-child(-n+5) { border-top: 0; font-size: 11.5px; color: var(--text-3); }
+.b-flow > :nth-child(5n+1) { text-align: left; }
+.b-flow button { min-height: 32px; padding: 0; font-weight: 600; color: var(--accent); }
+.b-edit-head { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.b-edit-head b { font-size: 16px; }
+.b-edit-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
+.b-edit-list > .b-edit-row:first-child { border-top: 0; }
+.b-edit-row .b-text { flex: 1; }
+.b-edit-row .b-in { width: 104px; }

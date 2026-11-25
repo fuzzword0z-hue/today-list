@@ -31,6 +31,7 @@ function renderToday() {
     : `${done} / ${total}${moved ? ` · 미룸 ${moved}` : ''}`;
 
   renderReportBanners();
+  renderBudgetBanner();
   renderCarePrompts();
   renderCarry();
 

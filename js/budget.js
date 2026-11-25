@@ -10,7 +10,11 @@
  *   items:  [{ id, label, g: 'in' | 'out' | 'save', amt?, card?, off? }]   amt가 있으면 매달 같은 돈 (그 달에 고치면 그 달만), card = 카드값
  *   cats:   [{ id, label, amt?, off? }]   쓸 돈 계획 항목 (식비 · 고양이 간식·캔 · 가족·친구 · 고양이 병원비)
  *   inst:   [{ id, label, total, n, start: 'YYYY-MM', done?: 'YYYY-MM' }]   할부: start 달 카드값부터 n번 (한꺼번에 갚으면 done)
- *   months: { 'YYYY-MM': { v: { 항목 id: 원 }, plan: { 계획 id: 원 }, fund?: 비상금 잔액, memo? } }
+ *   months: { 'YYYY-MM': { v: { 항목 id: 원 }, plan: { 계획 id: 원 }, fund?: 비상금 잔액, draw?: 비상금에서 꺼낸 돈,
+ *                          bal: { 모은 돈 항목 id: 통장 잔액 }, memo? } }
+ *   남은 돈이 모자란 달은 비상금에서 채운 금액(draw)을 적고, 남은 돈 = 들어온 − 나간 − 모은 + 꺼낸 돈.
+ *   모아 둔 돈(bal)은 생각날 때 적는 통장 잔액 — 안 적은 달은 마지막에 적은 금액을 보여 준다 (투자 계좌는 오르내려서 자동으로 더하지 않는다).
+ *   '비상금' 항목(id emerg)의 잔액은 fund에 둔다.
  * }   기본 항목은 core.js (BUDGET_ITEMS · BUDGET_CATS)
  * 좋다 · 나쁘다 판단 없이 숫자와 흐름만 보여 준다. 이 휴대폰에만 저장되고, 백업 파일에 함께 담긴다. */
 
@@ -47,6 +51,8 @@ const bStored = (ym, x) => (bm(ym).v || {})[x.id];
 const bVal = (ym, x) => (bStored(ym, x) !== undefined ? bStored(ym, x) : x.off ? 0 : x.amt || 0);
 const bSum = (ym, g) => bItems(ym, g).reduce((a, x) => a + bVal(ym, x), 0);
 const bLeft = (ym) => bSum(ym, 'in') - bSum(ym, 'out') - bSum(ym, 'save');
+/* 비상금에서 꺼낸 돈까지 더한 남은 돈 */
+const bFinal = (ym) => bLeft(ym) + (bm(ym).draw || 0);
 const cardSum = (ym) => B().items.filter((x) => x.card).reduce((a, x) => a + (bStored(ym, x) || 0), 0);
 const bHas = (ym) => !!B().months[ym] && Object.keys(B().months[ym].v || {}).length > 0;
 
@@ -66,18 +72,37 @@ function planVal(ym, c) {
 }
 const bCats = (ym) => B().cats.filter((c) => !c.off || (bm(ym).plan || {})[c.id] !== undefined);
 const planTotal = (ym) => bCats(ym).reduce((a, c) => a + planVal(ym, c), 0) + instDue(ymAdd(ym, 1)).reduce((a, x) => a + instAmt(x), 0);
-/* ym 전에 마지막으로 적은 비상금 잔액 */
-function fundBefore(ym) {
-  const ks = Object.keys(B().months).filter((m) => m < ym && B().months[m].fund !== undefined).sort();
+/* 모아 둔 돈: id 'fund'는 비상금 잔액(m.fund), 나머지는 m.bal[id]. 'emerg'(비상금) 항목의 잔액 = 비상금 잔액 */
+const FUND_ITEM = 'emerg';
+const balRaw = (m, id) => (id === 'fund' ? m.fund : (m.bal || {})[id]);
+/* ym까지(before면 ym 전까지) 마지막으로 적은 잔액 { ym, v } */
+function balLast(ym, id, before = false) {
+  const ks = Object.keys(B().months).filter((m) => (before ? m < ym : m <= ym) && balRaw(B().months[m], id) !== undefined).sort();
   const k = ks[ks.length - 1];
-  return k ? { ym: k, v: B().months[k].fund } : null;
+  return k ? { ym: k, v: balRaw(B().months[k], id) } : null;
 }
+/* 모아 둔 돈 줄: 모은 돈 항목마다 하나 (비상금 항목은 비상금 잔액 칸). 비상금 항목을 뺐어도 비상금 잔액 줄은 남긴다 */
+function balRows(ym) {
+  const rows = B().items.filter((x) => x.g === 'save' && (!x.off || ((bm(ym).bal || {})[x.id] !== undefined)))
+    .map((x) => ({ id: x.id === FUND_ITEM ? 'fund' : x.id, label: x.label }));
+  if (!rows.some((r) => r.id === 'fund')) rows.unshift({ id: 'fund', label: '비상금' });
+  return rows;
+}
+/* 잔액 줄 아래 한 줄: 이 달에 적었으면 지난번과 차이, 아니면 언제 적은 금액인지 */
+function balNote(ym, id) {
+  const here = balRaw(bm(ym), id);
+  if (here === undefined) { const last = balLast(ym, id); return last ? `${ymLabelShort(last.ym)}에 적은 금액` : ''; }
+  const prevB = balLast(ym, id, true);
+  return prevB && here !== prevB.v ? `${ymLabelShort(prevB.ym)}보다 ${here > prevB.v ? '+' : ''}${man(here - prevB.v)}` : '';
+}
+const balTotal = (ym) => balRows(ym).reduce((a, r) => a + ((balLast(ym, r.id) || {}).v || 0), 0);
 
 function bEnsure(ym) {
   const b = B();
   const m = b.months[ym] = b.months[ym] || {};
   m.v = m.v || {};
   m.plan = m.plan || {};
+  m.bal = m.bal || {};
   return m;
 }
 
@@ -90,7 +115,7 @@ function renderBudget() {
   if (bEdit) { el.innerHTML = budgetEditHtml(); return; }
   const m = bm(ym);
   const next = ymAdd(ym, 1);
-  const inp = (attr, v, label) => `<input class="b-in" ${attr} type="text" inputmode="numeric" autocomplete="off" aria-label="${esc(label)}" placeholder="0" value="${comma(v)}">`;
+  const inp = (attr, v, label, ph = '0') => `<input class="b-in" ${attr} type="text" inputmode="numeric" autocomplete="off" aria-label="${esc(label)}" placeholder="${ph}" value="${comma(v)}">`;
   const groups = B_GROUPS.map(([g, name]) => {
     const rows = bItems(ym, g).map((x) => {
       const fixed = !x.off && x.amt !== undefined && bStored(ym, x) === undefined;
@@ -107,8 +132,15 @@ function renderBudget() {
   const card = cardSum(ym);
   const compare = bHas(prev) && card
     ? `<p class="b-compare">지난 한 달(${ymLabelShort(prev)}) 계획 <b>${man(planTotal(prev))}</b> · 실제 카드값 <b>${man(card)}</b>${card !== planTotal(prev) ? ` (${card > planTotal(prev) ? '+' : ''}${man(card - planTotal(prev))})` : ''}</p>` : '';
-  const fb = fundBefore(ym);
-  const fundDiff = m.fund !== undefined && fb ? m.fund - fb.v : null;
+  const left = bLeft(ym);
+  // 모아 둔 돈: 이 달에 적은 잔액, 없으면 마지막에 적은 잔액(점선 칸)
+  const bals = balRows(ym).map((r) => {
+    const here = balRaw(m, r.id);
+    const last = balLast(ym, r.id);
+    const attr = r.id === 'fund' ? 'data-bfund' : `data-bbal="${r.id}"`;
+    return `<label class="b-row${here === undefined && last ? ' fixed' : ''}"><span class="b-lab">${esc(r.label)}<small data-bnote="${r.id}">${balNote(ym, r.id)}</small></span>
+      ${inp(attr, here !== undefined ? here : last ? last.v : undefined, `${r.label} 잔액`, '잔액')}<span class="b-unit">원</span></label>`;
+  }).join('');
   const plans = bCats(ym).map((c) => `<label class="b-row"><span class="b-lab">${esc(c.label)}</span>
       ${inp(`data-bp="${c.id}"`, planVal(ym, c), c.label)}<span class="b-unit">원</span></label>`).join('');
   const dueNext = instDue(next);
@@ -121,12 +153,16 @@ function renderBudget() {
       <button class="icon-btn" data-bmonth="1" aria-label="다음 달 가계부" ${ym >= cycleMonth() ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
     ${groups}
-    <section class="b-card b-left-card"><div class="b-head"><b>남은 돈</b><span class="b-left" data-bleft>${won(bLeft(ym))}</span></div>
-      <p class="b-sub">들어온 돈 − 나간 돈 − 모은 돈</p>
-      <label class="b-row"><span class="b-lab">비상금 잔액<small>${fb ? `${ymLabelShort(fb.ym)} ${man(fb.v)}` : '적어 두면 흐름이 보여요'}</small></span>
-        ${inp('data-bfund', m.fund, '비상금 잔액')}<span class="b-unit">원</span></label>
-      ${fundDiff !== null && fundDiff !== 0 ? `<p class="b-sub">지난번보다 ${fundDiff > 0 ? '+' : ''}${man(fundDiff)}</p>` : ''}
+    <section class="b-card b-left-card"><div class="b-head"><b>남은 돈</b><span class="b-left" data-bleft>${won(bFinal(ym))}</span></div>
+      <p class="b-sub">들어온 돈 − 나간 돈 − 모은 돈${m.draw !== undefined ? ' + 비상금에서 꺼낸 돈' : ''}</p>
+      ${m.draw !== undefined
+        ? `<label class="b-row b-draw"><span class="b-lab">비상금에서 꺼낸 돈<small>${left < 0 ? `모자란 ${won(-left)}` : '모자란 돈을 채운 만큼'}</small></span>
+          ${inp('data-bdraw', m.draw, '비상금에서 꺼낸 돈')}<span class="b-unit">원</span></label>`
+        : left < 0 ? `<button type="button" class="b-fill" data-bdrawfill>모자란 ${won(-left)}은 비상금에서 채웠어요</button>` : ''}
       ${compare}</section>
+    <section class="b-card"><div class="b-head"><b>모아 둔 돈<small>통장 잔액</small></b><span class="b-sum" data-bbaltotal>${won(balTotal(ym))}</span></div>
+      <p class="b-sub">통장 잔액을 생각날 때 적어요. 안 적은 달은 마지막에 적은 금액이 나와요. 넣은 돈이 없는 달에도 모아 둔 돈은 그대로예요.</p>
+      ${bals}</section>
     <section class="b-card"><div class="b-head"><b>다음 급여일까지 쓸 돈</b><span class="b-sum" data-bplan>${won(planTotal(ym))}</span></div>
       <p class="b-sub">${md(payKey(ym))} – ${md(addDays(payKey(next), -1))} · 계획일 뿐이에요. 다음 달 카드값과 나란히 보여 줘요</p>
       ${plans}
@@ -163,7 +199,9 @@ function budgetFlowHtml(ym) {
   const pension = B().items.filter((x) => x.g === 'save' && /irp|연금/i.test(x.label)).reduce((a, x) => a + yms.reduce((b, m) => b + bVal(m, x), 0), 0);
   return `<section class="b-card"><div class="b-head"><b>흐름</b><span class="b-sum">최근 ${ms.length}달</span></div>
     <div class="b-flow"><span></span><span>카드값</span><span>모은 돈</span><span>남은 돈</span><span>비상금</span>
-      ${ms.map((m) => `<button type="button" data-bgo="${m}">${ymLabelShort(m)}</button><span>${man(cardSum(m))}</span><span>${man(bSum(m, 'save'))}</span><span>${man(bLeft(m))}</span><span>${bm(m).fund !== undefined ? man(bm(m).fund) : '–'}</span>`).join('')}</div>
+      ${ms.map((m) => `<button type="button" data-bgo="${m}">${ymLabelShort(m)}</button><span>${man(cardSum(m))}</span><span>${man(bSum(m, 'save'))}</span><span>${man(bFinal(m))}</span>
+        <span>${bm(m).fund !== undefined ? man(bm(m).fund) : '–'}${bm(m).draw ? `<small>꺼냄 ${man(bm(m).draw)}</small>` : ''}</span>`).join('')}</div>
+    ${balTotal(ym) ? `<p class="b-sub"><b>모아 둔 돈</b> <span data-bbaltotal>${won(balTotal(ym))}</span> (${ymLabelShort(ym)}까지 적은 잔액 합)</p>` : ''}
     ${saved.length ? `<p class="b-sub"><b>${y}년 모은 돈</b> ${saved.map(([l, v]) => `${esc(l)} ${man(v)}`).join(' · ')}</p>` : ''}
     ${pension ? `<p class="b-sub">IRP · 연금저축 올해 ${won(pension)} — 세액공제 한도는 연말정산 안내로 확인해요.</p>` : ''}
   </section>`;
@@ -215,7 +253,8 @@ function updateBudgetSums() {
   const ym = ui.budgetMonth;
   for (const [g] of B_GROUPS) { const s = $('budget').querySelector(`[data-bsum="${g}"]`); if (s) s.textContent = won(bSum(ym, g)); }
   const l = $('budget').querySelector('[data-bleft]');
-  if (l) l.textContent = won(bLeft(ym));
+  if (l) l.textContent = won(bFinal(ym));
+  for (const bt of $('budget').querySelectorAll('[data-bbaltotal]')) bt.textContent = won(balTotal(ym));
   const p = $('budget').querySelector('[data-bplan]');
   if (p) p.textContent = won(planTotal(ym));
 }
@@ -229,7 +268,10 @@ $('budget').addEventListener('input', (e) => {
   if (t.dataset.bv) { if (v === null) delete m.v[t.dataset.bv]; else m.v[t.dataset.bv] = v; }
   else if (t.dataset.bp) { if (v === null) delete m.plan[t.dataset.bp]; else m.plan[t.dataset.bp] = v; }
   else if (t.hasAttribute('data-bfund')) { if (v === null) delete m.fund; else m.fund = v; }
-  if (t.dataset.bv) t.closest('.b-row').classList.remove('fixed'); // 이 달만 다른 금액
+  else if (t.dataset.bbal) { m.bal = m.bal || {}; if (v === null) delete m.bal[t.dataset.bbal]; else m.bal[t.dataset.bbal] = v; }
+  else if (t.hasAttribute('data-bdraw')) m.draw = v || 0; // 쓰는 동안은 칸을 남기고, 비운 채 나가면 지운다 (focusout)
+  if (t.dataset.bv || t.dataset.bbal || t.hasAttribute('data-bfund')) t.closest('.b-row').classList.remove('fixed'); // 이 달에 적은 금액
+  if (t.dataset.bbal || t.hasAttribute('data-bfund')) { const id = t.dataset.bbal || 'fund'; t.closest('.b-row').querySelector('[data-bnote]').textContent = balNote(ym, id); }
   saveSoon();
   updateBudgetSums();
 });
@@ -237,6 +279,8 @@ $('budget').addEventListener('focusin', (e) => { if (e.target.matches('.b-in')) 
 $('budget').addEventListener('focusout', (e) => {
   if (!e.target.matches('.b-in')) return;
   e.target.value = comma(digits(e.target.value));
+  // 비상금에서 꺼낸 돈을 비우면 그 줄을 지우고 다시 '채웠어요' 버튼으로
+  if (e.target.hasAttribute('data-bdraw') && !digits(e.target.value)) { delete bEnsure(ui.budgetMonth).draw; save(); renderBudget(); }
 });
 
 $('budget').addEventListener('click', (e) => {
@@ -280,6 +324,13 @@ $('budget').addEventListener('click', (e) => {
     bInstAdd = a === 'open';
     renderBudget();
     if (bInstAdd) $('bi-label').focus();
+    return;
+  }
+  if (e.target.closest('[data-bdrawfill]')) {
+    const need = -bLeft(ym);
+    undoable(`모자란 ${won(need)}을 비상금에서 채웠어요`, () => { bEnsure(ym).draw = need; });
+    const f = $('budget').querySelector('[data-bdraw]');
+    if (f) f.closest('.b-row').scrollIntoView({ block: 'center' });
     return;
   }
   const dn = e.target.closest('[data-bdone]');

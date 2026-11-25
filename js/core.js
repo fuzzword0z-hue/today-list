@@ -25,7 +25,7 @@
  *   mind, compass, compassHide, feelCustom, fillCustom  일기 탭의 나머지: 오늘 해낸 것 · 마음 이름 · 질문 · 나를 채우는 시간 ·
  *                                     흔들린 순간, 나침반 문장 (js/diary.js)
  *   sns, money                        없앤 '나를 지키는 환경' 칸 (백업에 그대로 남긴다)
- *   budget: { items, cats, inst, months }   급여일에 적는 가계부 (통계 탭 → 가계부, js/budget.js)
+ *   budget: { items, cats, inst, months }   급여일에 적는 가계부 · 비상금에서 꺼낸 돈 · 모아 둔 돈 (통계 탭 → 가계부, js/budget.js)
  * 케어 일정에는 ck('dose' 투약·처치 | 'vet' 병원)와 skip { 'YYYY-MM-DD': ms } (못 함·안 감)이 더 붙는다.
  * }
  */
@@ -166,8 +166,9 @@ function normalize(s) {
     if (!/^\d{4}-\d{2}$/.test(ym) || !obj(m)) { delete s.budget.months[ym]; continue; }
     m.v = obj(m.v) ? m.v : {};
     m.plan = obj(m.plan) ? m.plan : {};
-    for (const o of [m.v, m.plan]) for (const id in o) if (typeof o[id] !== 'number' || !(o[id] >= 0)) delete o[id];
-    if (m.fund !== undefined && (typeof m.fund !== 'number' || !(m.fund >= 0))) delete m.fund;
+    m.bal = obj(m.bal) ? m.bal : {};
+    for (const o of [m.v, m.plan, m.bal]) for (const id in o) if (typeof o[id] !== 'number' || !(o[id] >= 0)) delete o[id];
+    for (const f of ['fund', 'draw']) if (m[f] !== undefined && (typeof m[f] !== 'number' || !(m[f] >= 0))) delete m[f];
     if (m.memo !== undefined && typeof m.memo !== 'string') delete m.memo;
   }
   if (s.dismissed === undefined) s.dismissed = null;

@@ -42,12 +42,11 @@ const BUDGET_ITEMS = [
   { id: 'family', g: 'out', label: '가족여행비(모임비)', amt: 50000 },
   { id: 'credit', g: 'out', label: '카드값(신용카드)', card: 1 },
   { id: 'check', g: 'out', label: '카드값(체크카드)', card: 1 },
-  { id: 'vetsave', g: 'save', label: '찡찡이 병원비(저축)' },
   { id: 'irp', g: 'save', label: 'IRP(미래에셋)' },
   { id: 'isa', g: 'save', label: 'ISA(미래에셋)' },
   { id: 'pension', g: 'save', label: '연금저축펀드(삼성)' },
   { id: 'sub', g: 'save', label: '청약', amt: 20000 },
-  { id: 'emerg', g: 'save', label: '비상금' },
+  { id: 'emerg', g: 'save', label: '비상금(찡찡이 병원비)' }, // 찡찡이 병원비 = 비상금 (7-24)
 ];
 /* 다음 급여일까지 쓸 돈 (계획) */
 const BUDGET_CATS = [
@@ -161,6 +160,20 @@ function normalize(s) {
     inst: Array.isArray(b.inst) ? b.inst.filter((x) => goodItem(x) && x.total > 0 && x.n >= 1 && /^\d{4}-\d{2}$/.test(x.start)) : [],
     months: obj(b.months) ? b.months : {},
   };
+  // 찡찡이 병원비 저축 = 비상금 (7-24): 따로 있던 '찡찡이 병원비(저축)' 항목을 비상금으로 합친다 (그 항목이 남아 있을 때 한 번)
+  const vet = s.budget.items.find((x) => x.id === 'vetsave');
+  const emerg = s.budget.items.find((x) => x.id === 'emerg');
+  if (vet && emerg) {
+    for (const ym in s.budget.months) {
+      const m = s.budget.months[ym];
+      if (!obj(m)) continue;
+      if (obj(m.v) && typeof m.v.vetsave === 'number') { m.v.emerg = (typeof m.v.emerg === 'number' ? m.v.emerg : 0) + m.v.vetsave; delete m.v.vetsave; }
+      if (obj(m.bal) && m.bal.vetsave !== undefined) { if (m.fund === undefined) m.fund = m.bal.vetsave; delete m.bal.vetsave; }
+    }
+    s.budget.items = s.budget.items.filter((x) => x !== vet);
+    if (emerg.label === '비상금') emerg.label = '비상금(찡찡이 병원비)';
+    delete emerg.off;
+  }
   for (const ym in s.budget.months) {
     const m = s.budget.months[ym];
     if (!/^\d{4}-\d{2}$/.test(ym) || !obj(m)) { delete s.budget.months[ym]; continue; }

@@ -1440,7 +1440,7 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .b-inst-form select { height: 38px; padding: 0 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 15px; }
 .b-text { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
 .b-memo { display: block; width: 100%; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; line-height: 1.5; resize: none; }
-.b-flow { display: grid; grid-template-columns: 2.6em repeat(4, minmax(0, 1fr)); margin-top: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.b-flow { display: grid; grid-template-columns: 2.6em repeat(4, minmax(0, 1fr)); align-items: baseline; margin-top: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .b-flow > * { padding: 7px 0 7px 6px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
 .b-flow > :nth-child(-n+5) { border-top: 0; font-size: 11.5px; color: var(--text-3); }
 .b-flow > :nth-child(5n+1) { text-align: left; }
@@ -1451,3 +1451,8 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .b-edit-list > .b-edit-row:first-child { border-top: 0; }
 .b-edit-row .b-text { flex: 1; }
 .b-edit-row .b-in { width: 104px; }
+.b-fill { display: block; width: 100%; min-height: 44px; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 14px; font-weight: 600; text-align: center; }
+.b-draw .b-in { color: var(--accent); }
+.b-flow small { display: block; font-size: 10.5px; color: var(--text-3); }
+.b-lab small:empty { display: none; }
+.b-head b small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--text-3); }

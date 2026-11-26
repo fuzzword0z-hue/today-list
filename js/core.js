@@ -182,6 +182,7 @@ function normalize(s) {
     m.bal = obj(m.bal) ? m.bal : {};
     for (const o of [m.v, m.plan, m.bal]) for (const id in o) if (typeof o[id] !== 'number' || !(o[id] >= 0)) delete o[id];
     for (const f of ['fund', 'draw']) if (m[f] !== undefined && (typeof m[f] !== 'number' || !(m[f] >= 0))) delete m[f];
+    if (m.got !== undefined) { if (Array.isArray(m.got)) m.got = m.got.filter((x) => typeof x === 'string'); else delete m.got; }
     if (m.memo !== undefined && typeof m.memo !== 'string') delete m.memo;
   }
   if (s.dismissed === undefined) s.dismissed = null;

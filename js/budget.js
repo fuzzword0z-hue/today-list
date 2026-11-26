@@ -11,7 +11,8 @@
  *   cats:   [{ id, label, amt?, off? }]   쓸 돈 계획 항목 (식비 · 고양이 간식·캔 · 가족·친구 · 고양이 병원비)
  *   inst:   [{ id, label, total, n, start: 'YYYY-MM', done?: 'YYYY-MM' }]   할부: start 달 카드값부터 n번 (한꺼번에 갚으면 done)
  *   months: { 'YYYY-MM': { v: { 항목 id: 원 }, plan: { 계획 id: 원 }, fund?: 비상금 잔액, draw?: 비상금에서 꺼낸 돈,
- *                          bal: { 모은 돈 항목 id: 통장 잔액 }, memo? } }
+ *                          bal: { 모은 돈 항목 id: 통장 잔액 }, got?: [이미 산 계획 id], memo? } }
+ *   쓸 돈 계획에서 이미 산 것은 '샀어요'(got)로 체크 → '샀어요 n · 앞으로 쓸 돈 n · 할부 n'으로 나눠 본다 (7-25).
  *   남은 돈이 모자란 달은 비상금에서 채운 금액(draw)을 적고, 남은 돈 = 들어온 − 나간 − 모은 + 꺼낸 돈.
  *   모아 둔 돈(bal)은 생각날 때 적는 통장 잔액 — 안 적은 달은 마지막에 적은 금액을 보여 준다 (투자 계좌는 오르내려서 자동으로 더하지 않는다).
  *   '비상금' 항목(id emerg)의 잔액은 fund에 둔다.
@@ -71,6 +72,18 @@ function planVal(ym, c) {
   return c.amt || 0;
 }
 const bCats = (ym) => B().cats.filter((c) => !c.off || (bm(ym).plan || {})[c.id] !== undefined);
+/* 쓸 돈 계획 나눠 보기: 샀어요 체크한 것 · 앞으로 쓸 것 · 할부 (다음 달 카드값에 이미 정해진 몫) */
+const gotOf = (ym) => (Array.isArray(bm(ym).got) ? bm(ym).got : []);
+function planSplit(ym) {
+  const got = gotOf(ym);
+  const r = { got: 0, left: 0, inst: instDue(ymAdd(ym, 1)).reduce((a, x) => a + instAmt(x), 0) };
+  for (const c of bCats(ym)) r[got.includes(c.id) ? 'got' : 'left'] += planVal(ym, c);
+  return r;
+}
+const splitText = (ym) => {
+  const r = planSplit(ym);
+  return r.got ? `샀어요 <b>${man(r.got)}</b> · 앞으로 쓸 돈 <b>${man(r.left)}</b>${r.inst ? ` · 할부 ${man(r.inst)}` : ''}` : '';
+};
 const planTotal = (ym) => bCats(ym).reduce((a, c) => a + planVal(ym, c), 0) + instDue(ymAdd(ym, 1)).reduce((a, x) => a + instAmt(x), 0);
 /* 모아 둔 돈: id 'fund'는 비상금 잔액(m.fund), 나머지는 m.bal[id]. 'emerg'(비상금) 항목의 잔액 = 비상금 잔액 */
 const FUND_ITEM = 'emerg';
@@ -141,8 +154,12 @@ function renderBudget() {
     return `<label class="b-row${here === undefined && last ? ' fixed' : ''}"><span class="b-lab">${esc(r.label)}<small data-bnote="${r.id}">${balNote(ym, r.id)}</small></span>
       ${inp(attr, here !== undefined ? here : last ? last.v : undefined, `${r.label} 잔액`, '잔액')}<span class="b-unit">원</span></label>`;
   }).join('');
-  const plans = bCats(ym).map((c) => `<label class="b-row"><span class="b-lab">${esc(c.label)}</span>
-      ${inp(`data-bp="${c.id}"`, planVal(ym, c), c.label)}<span class="b-unit">원</span></label>`).join('');
+  // 계획 줄: 왼쪽 동그라미 = 샀어요 (줄 전체를 label로 감싸지 않는다 — 이름을 누르면 체크되지 않게)
+  const got = gotOf(ym);
+  const plans = bCats(ym).map((c) => `<div class="b-row b-plan${got.includes(c.id) ? ' got' : ''}">
+      <button type="button" class="b-got" data-bgot="${c.id}" aria-pressed="${got.includes(c.id)}" aria-label="${esc(c.label)} 샀어요"><span class="check">${CHECK_SVG}</span></button>
+      <span class="b-lab">${esc(c.label)}<small>${got.includes(c.id) ? '샀어요' : ''}</small></span>
+      ${inp(`data-bp="${c.id}"`, planVal(ym, c), c.label)}<span class="b-unit">원</span></div>`).join('');
   const dueNext = instDue(next);
   const active = B().inst.filter((x) => instLeft(x, ym) > 0 || ym < x.start || x.done === ym);
 
@@ -164,7 +181,8 @@ function renderBudget() {
       <p class="b-sub">통장 잔액을 생각날 때 적어요. 안 적은 달은 마지막에 적은 금액이 나와요. 넣은 돈이 없는 달에도 모아 둔 돈은 그대로예요.</p>
       ${bals}</section>
     <section class="b-card"><div class="b-head"><b>다음 급여일까지 쓸 돈</b><span class="b-sum" data-bplan>${won(planTotal(ym))}</span></div>
-      <p class="b-sub">${md(payKey(ym))} – ${md(addDays(payKey(next), -1))} · 계획일 뿐이에요. 다음 달 카드값과 나란히 보여 줘요</p>
+      <p class="b-sub">${md(payKey(ym))} – ${md(addDays(payKey(next), -1))} · 계획일 뿐이에요. 다음 달 카드값과 나란히 보여 줘요. 이미 산 것은 ○를 눌러 '샀어요'로 (금액은 실제 쓴 돈으로 고쳐도 돼요)</p>
+      <p class="b-split" data-bsplit>${splitText(ym)}</p>
       ${plans}
       ${dueNext.map((x) => `<div class="b-row b-ro"><span class="b-lab">할부 · ${esc(x.label)}<small>${ymDiff(x.start, next) + 1}/${x.n}회</small></span><span class="b-ro-v">${won(instAmt(x))}</span></div>`).join('')}
     </section>
@@ -257,6 +275,8 @@ function updateBudgetSums() {
   for (const bt of $('budget').querySelectorAll('[data-bbaltotal]')) bt.textContent = won(balTotal(ym));
   const p = $('budget').querySelector('[data-bplan]');
   if (p) p.textContent = won(planTotal(ym));
+  const sp = $('budget').querySelector('[data-bsplit]');
+  if (sp) sp.innerHTML = splitText(ym);
 }
 $('budget').addEventListener('input', (e) => {
   const t = e.target;
@@ -324,6 +344,23 @@ $('budget').addEventListener('click', (e) => {
     bInstAdd = a === 'open';
     renderBudget();
     if (bInstAdd) $('bi-label').focus();
+    return;
+  }
+  // 샀어요: 다시 그리지 않고 그 줄과 나눠 보기만 고친다
+  const gb = e.target.closest('[data-bgot]');
+  if (gb) {
+    const m = bEnsure(ym);
+    const id = gb.dataset.bgot;
+    const on = !gotOf(ym).includes(id);
+    m.got = on ? [...gotOf(ym), id] : gotOf(ym).filter((x) => x !== id);
+    if (!m.got.length) delete m.got;
+    save();
+    gb.setAttribute('aria-pressed', String(on));
+    const row = gb.closest('.b-plan');
+    row.classList.toggle('got', on);
+    row.querySelector('.b-lab small').textContent = on ? '샀어요' : '';
+    if (on && navigator.vibrate) navigator.vibrate(8);
+    updateBudgetSums();
     return;
   }
   if (e.target.closest('[data-bdrawfill]')) {

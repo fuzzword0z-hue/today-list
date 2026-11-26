@@ -1456,3 +1456,16 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .b-flow small { display: block; font-size: 10.5px; color: var(--text-3); }
 .b-lab small:empty { display: none; }
 .b-head b small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--text-3); }
+/* 쓸 돈 계획: 샀어요 */
+.b-got { flex: none; display: grid; place-items: center; width: 40px; height: 44px; margin-left: -8px; padding: 0; }
+.b-got .check { width: 22px; height: 22px; }
+.b-plan.got .check { background: var(--accent); border-color: var(--accent); }
+.b-plan.got .check svg { opacity: 1; }
+.b-plan.got .b-lab { color: var(--text-2); }
+.b-plan.got .b-lab small { color: var(--accent); font-weight: 600; }
+.b-plan.got .b-in { color: var(--text-2); }
+.b-split { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); font-size: 13px; line-height: 1.55; color: var(--text-2); }
+.b-split:empty { display: none; }
+.b-split b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.b-sub + .b-split + .b-row { border-top: 0; }

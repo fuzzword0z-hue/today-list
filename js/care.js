@@ -543,3 +543,60 @@ function weightChart(ws) {
 }
 
 function openCareSummary() { go('report', { push: true, id: 'care' }); }
+
+/* ───────── 통계 → 기록: 고양이 체중 (7-26) ─────────
+ * 오늘 화면 '고양이 컨디션'의 체중(cond[날짜].w)을 모아 변화만 본다: 마지막 체중, 지난번 · 처음 기록과의 차이(kg · %),
+ * 그래프(최근 12번), 기록 목록(지난번과 차이). 병원에서 잰 체중을 나중에 적을 수 있게 날짜를 골라 적기 · 지우기.
+ * 좋다 · 나쁘다 판단 없이 숫자만 보여 준다. */
+const CW_LIST = 6; // 목록에 바로 보이는 기록 수 (나머지는 '이전 기록'에 접어 둔다)
+const catWeights = () => Object.keys(state.cond).filter((k) => state.cond[k] && state.cond[k].w).sort().map((k) => ({ k, w: state.cond[k].w }));
+/* a → b 차이: '−0.15kg (−2.3%)', 같으면 '변화 없음' */
+function kgDiff(a, b) {
+  const d = Math.round((b - a) * 100) / 100;
+  if (!d) return '변화 없음';
+  const p = Math.round((Math.abs(d) / a) * 1000) / 10;
+  return `${d > 0 ? '+' : '−'}${Math.abs(d)}kg (${d > 0 ? '+' : '−'}${p}%)`;
+}
+
+function renderCatStats() {
+  const ws = catWeights();
+  const n = ws.length;
+  const last = ws[n - 1];
+  const prev = ws[n - 2];
+  const row = (x, i) => `<li><span class="cw-date">${md(x.k)}</span><b>${fmtKg(x.w)}</b>
+      <span class="cw-ch">${i ? kgDiff(ws[i - 1].w, x.w) : '처음 기록'}</span>
+      <button type="button" class="cw-del" data-cwdel="${x.k}" aria-label="${md(x.k)} ${fmtKg(x.w)} 지우기">✕</button></li>`;
+  const rows = ws.map(row).reverse(); // 최근 것부터
+  $('catstats').innerHTML = `<h2 class="sub-head">고양이 체중</h2>
+    <div class="hs-card">
+      ${last ? `<p class="hs-one">${fmtKg(last.w)} <small>${md(last.k)}</small></p>`
+        : '<p class="h-empty">아직 체중 기록이 없어요. 병원이나 집에서 잰 날 적어 두면 변화가 보여요.</p>'}
+      ${prev ? `<p class="cw-sum">지난번 ${ml(prev.k)} ${fmtKg(prev.w)}보다 <b>${kgDiff(prev.w, last.w)}</b></p>` : ''}
+      ${n >= 3 ? `<p class="cw-sum">처음 기록 ${ml(ws[0].k)} ${fmtKg(ws[0].w)}보다 <b>${kgDiff(ws[0].w, last.w)}</b></p>` : ''}
+      ${n >= 2 ? weightChart(ws.slice(-12)) : n ? '<p class="h-empty">한 번 더 적으면 변화가 보여요.</p>' : ''}
+      <div class="hs-w-row">
+        <input type="date" id="cw-d" max="${today}" value="${today}" aria-label="잰 날">
+        <input class="cond-w" id="cw-w" type="number" inputmode="decimal" step="0.01" min="0" max="30" placeholder="0.00" aria-label="고양이 체중"><span class="cond-unit">kg</span>
+        <button type="button" class="hs-save cw-save" id="cw-save">기록</button>
+      </div>
+      ${n ? `<ul class="cw-list">${rows.slice(0, CW_LIST).join('')}</ul>` : ''}
+      ${n > CW_LIST ? `<details class="cw-more"><summary>이전 기록 ${n - CW_LIST}개</summary><ul class="cw-list">${rows.slice(CW_LIST).join('')}</ul></details>` : ''}
+    </div>`;
+}
+$('catstats').addEventListener('click', (e) => {
+  if (e.target.closest('#cw-save')) {
+    const d = $('cw-d').value || today;
+    const w = parseFloat($('cw-w').value);
+    if (d > today) { toast('오늘이나 지난 날짜만 적을 수 있어요'); return; }
+    if (!(w > 0 && w < 30)) { toast('체중은 0–30kg 사이로 적어 주세요'); return; }
+    const v = Math.round(w * 100) / 100;
+    const had = state.cond[d] && state.cond[d].w;
+    undoable(`${ml(d)} 고양이 체중 ${fmtKg(v)}을 ${had ? '고쳤어요' : '적었어요'}`, () => setCond(d, 'w', v));
+    return;
+  }
+  const del = e.target.closest('[data-cwdel]');
+  if (del) undoable(`${ml(del.dataset.cwdel)} 고양이 체중 기록을 지웠어요`, () => setCond(del.dataset.cwdel, 'w', null));
+});
+$('catstats').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'cw-w') { e.preventDefault(); $('cw-save').click(); }
+});

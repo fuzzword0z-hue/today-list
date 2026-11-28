@@ -286,7 +286,7 @@ function renderReport(id) {
     if (list.length) {
       ahead = `<section class="r-sec"><h2>${m.yearly ? '올해' : '이번 달'} 주요 일정</h2><ul class="up-list">${list.map((x) => `
         <li class="up cat-${x.cat}"><span class="dday">${dday(x.date)}</span>
-        <span class="up-body"><span class="up-title">${esc(x.title)}</span><span class="up-sub">${mdw(x.date)} · ${CATS[x.cat].label}</span></span></li>`).join('')}</ul></section>`;
+        <span class="up-body"><span class="up-title">${esc(x.title)}</span><span class="up-sub">${mdw(x.date)}${x.end ? `–${mdw(x.end)}` : ''} · ${CATS[x.cat].label}</span></span></li>`).join('')}</ul></section>`;
     }
   }
 

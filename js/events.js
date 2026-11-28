@@ -13,6 +13,9 @@ const CARE_KINDS = {
   vet: { label: '병원', short: '병원', hint: '병원 진료·검사 — 다녀오면 체크해요. 진료 전 요약에 쓰여요', yes: '다녀왔어요', no: '안 갔어요', noShort: '안 감' },
 };
 const REP_LABEL = { d1: '매일', d2: '이틀마다', d3: '3일마다', w1: '매주', w2: '2주마다', m1: '매달', y1: '매년' };
+/* 여러 날 일정(여행 등): end = 끝나는 날(그 날 포함). 반복 없는 공적 · 사적 일정만 (7-27) */
+const spanDays = (ev) => (ev.end && !ev.rep ? diffDays(ev.end, ev.date) + 1 : 1);
+const spanText = (ev, k) => (spanDays(ev) > 1 ? `${ml(ev.date)}–${ml(ev.end)}${k ? ` · ${diffDays(k, ev.date) + 1}/${spanDays(ev)}일` : ''}` : '');
 const repKey = (r) => (r ? `${r.t}${r.n}` : '');
 const repLabel = (r) => (r ? REP_LABEL[repKey(r)] || `${r.n}${r.t === 'd' ? '일' : r.t === 'w' ? '주' : r.t === 'y' ? '년' : '달'}마다` : '');
 
@@ -55,7 +58,7 @@ function occursOn(ev, k) {
   if (ev.until && k > ev.until) return false;
   if (ev.ex && ev.ex.includes(k)) return false;
   const r = ev.rep;
-  if (!r) return k === ev.date;
+  if (!r) return ev.end ? k <= ev.end : k === ev.date; // 여러 날 일정은 시작일부터 끝나는 날까지
   if (r.t === 'd') return diffDays(k, ev.date) % r.n === 0;
   if (r.t === 'w') return diffDays(k, ev.date) % (7 * r.n) === 0;
   // 매달·매년: 같은 날짜. 31일·2월 29일처럼 없는 날짜면 그 달의 마지막 날
@@ -120,10 +123,10 @@ function eventRow(ev, k) {
   const kind = careKind(ev);
   const skipped = kind && !done && isSkipped(ev, k);
   const changed = ev.of ? (ev.ok && ev.ok !== ev.date ? `이 날만 변경 (원래 ${md(ev.ok)})` : '이 날만 변경') : '';
-  const meta = [CATS[ev.cat].label + (kind ? ` · ${CARE_KINDS[kind].short}` : ''), repLabel(ev.rep), changed].filter(Boolean).join(' · ');
+  const meta = [CATS[ev.cat].label + (kind ? ` · ${CARE_KINDS[kind].short}` : ''), spanText(ev, k), repLabel(ev.rep), changed].filter(Boolean).join(' · ');
   const late = kind && !done && !skipped && k < today;
   return `<li class="ev cat-${ev.cat}${done ? ' done' : ''}${skipped ? ' skipped' : ''}" data-eid="${ev.id}" data-k="${k}" tabindex="0" role="button" aria-label="${esc(ev.title)} 일정 열기">
-    <span class="ev-time">${ev.time || '종일'}</span>
+    <span class="ev-time">${ev.time && k === ev.date ? ev.time : '종일'}</span>
     <span class="ev-body">
       <span class="ev-title">${esc(ev.title)}</span>
       <span class="ev-meta">${meta}${late ? ' · <em>기록 없음</em>' : ''}${skipped ? ` · <em class="muted">${CARE_KINDS[kind].noShort}</em>` : ''}${ev.memo ? ` · ${esc(ev.memo)}` : ''}</span>
@@ -154,6 +157,7 @@ function setCat(cat) {
   if (cat === 'care') setKind(sheetKind);
   else { $('cat-hint').textContent = CATS[cat].hint; $('vet-hint').hidden = true; }
   renderSheetRecord();
+  renderEndField();
 }
 
 function setKind(kind) {
@@ -176,6 +180,18 @@ function renderVetHint() {
     <button type="button" data-d="${w4}">4주 후 ${md(w4)}</button>
     <button type="button" data-d="${w5}">5주 후 ${md(w5)}</button>`;
 }
+
+/* 여러 날: 반복 없는 공적 · 사적 일정만. 비어 있으면 '여러 날이면 고르기' 버튼, 고르면 날짜 칸 + '하루만' */
+function renderEndField() {
+  const can = sheetCat !== 'care' && !$('ev-rep').value;
+  $('ev-end-field').hidden = !can;
+  const has = !!$('ev-end').value;
+  $('ev-end').hidden = !has;
+  $('ev-end').min = $('ev-date').value;
+  $('ev-end-btn').textContent = has ? '하루만' : '여러 날이면 고르기';
+  $('ev-end-btn').classList.toggle('wide', !has);
+}
+let sheetDate = ''; // 날짜를 옮기면 끝나는 날도 같은 만큼 옮긴다
 
 /* 수정할 때: 그 날의 케어 기록(했음 / 못 했음 / 기록 없음)을 바로 바꾼다 */
 function renderSheetRecord() {
@@ -200,7 +216,10 @@ function openSheet({ id = null, k = ui.calSel || today, preset = null } = {}) {
   $('sheet-title').textContent = ev ? '일정 수정' : '일정 추가';
   $('ev-title').value = src.title || '';
   sheetKind = careKind(src.cat === 'care' ? src : {}) || 'vet';
-  $('ev-date').value = k;
+  // 반복 없는 일정은 시작일을 (여러 날 일정의 가운데 날을 눌러 열어도)
+  $('ev-date').value = ev && !ev.rep ? ev.date : k;
+  sheetDate = $('ev-date').value;
+  $('ev-end').value = (!src.rep && src.end) || '';
   $('ev-time').value = src.time || '';
   $('ev-rep').value = repKey(src.rep);
   $('ev-memo').value = src.memo || '';
@@ -239,6 +258,18 @@ $('sheet-record').addEventListener('click', (e) => {
   renderSheetRecord();
 });
 $('ev-time-clear').addEventListener('click', () => { $('ev-time').value = ''; });
+$('ev-end-btn').addEventListener('click', () => {
+  if ($('ev-end').value) $('ev-end').value = '';
+  else { $('ev-end').value = addDays($('ev-date').value || today, 1); setTimeout(() => $('ev-end').focus(), 0); }
+  renderEndField();
+});
+$('ev-rep').addEventListener('change', renderEndField);
+$('ev-date').addEventListener('change', () => {
+  const d = $('ev-date').value;
+  if (d && sheetDate && $('ev-end').value) $('ev-end').value = addDays($('ev-end').value, diffDays(d, sheetDate));
+  if (d) sheetDate = d;
+  renderEndField();
+});
 $('sheet').addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeSheet(); });
 $('sheet').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
@@ -251,6 +282,7 @@ function readForm() {
     time: $('ev-time').value || undefined,
     memo: $('ev-memo').value.trim() || undefined,
     rep: rep ? { t: rep[0], n: +rep.slice(1) } : undefined,
+    end: !rep && sheetCat !== 'care' && $('ev-end').value ? $('ev-end').value : undefined,
     ck: sheetCat === 'care' ? sheetKind : undefined,
   };
   for (const key of Object.keys(f)) if (f[key] === undefined) delete f[key];
@@ -285,6 +317,8 @@ $('ev-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = readForm();
   if (!f.title || !f.date) return;
+  if (f.end && f.end < f.date) { toast('끝나는 날이 시작하는 날보다 빨라요'); return; }
+  if (f.end === f.date) delete f.end;
   const ctx = sheetCtx;
   const ev = ctx.id ? state.events.find((x) => x.id === ctx.id) : null;
 
@@ -293,7 +327,7 @@ $('ev-form').addEventListener('submit', async (e) => {
     save();
     closeSheet();
     afterSave(f.date);
-    toast(`${md(f.date)}에 일정을 추가했어요`);
+    toast(f.end ? `${md(f.date)}–${md(f.end)} 일정을 추가했어요` : `${md(f.date)}에 일정을 추가했어요`);
     return;
   }
 

@@ -6,7 +6,7 @@
  *   v: 2,
  *   days: { 'YYYY-MM-DD': [ { id, t, d, at?, m?, f? } ] },   할 일
  *     t 내용 · d 완료(0/1) · at 완료 시각(ms) · m 미룬 날짜 · f 가져온 원래 날짜
- *   events: [ { id, title, cat, date, time?, rep?, until?, ex?, memo?, done? } ],   일정
+ *   events: [ { id, title, cat, date, end?, time?, rep?, until?, ex?, memo?, done? } ],   일정 (end: 여러 날 일정의 끝나는 날)
  *     cat 'work'(공적) | 'life'(사적) | 'care'(케어)
  *     rep { t: 'd'|'w'|'m', n } 반복 — d: n일마다, w: n주마다, m: n달마다
  *     until 반복 끝나는 날 · ex 반복 중 뺀 날짜들 · done { 'YYYY-MM-DD': ms } 케어 완료 기록
@@ -74,6 +74,10 @@ function load() {
 function normalize(s) {
   s.v = 2;
   s.events = Array.isArray(s.events) ? s.events : [];
+  // 여러 날 일정의 끝나는 날: 날짜 모양이 아니거나 시작일보다 빠르거나 반복 일정이면 버린다
+  for (const ev of s.events) {
+    if (ev && ev.end !== undefined && (typeof ev.end !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ev.end) || !(ev.end > ev.date) || ev.rep)) delete ev.end;
+  }
   s.seen = Array.isArray(s.seen) ? s.seen : [];
   const obj = (o) => o && typeof o === 'object' && !Array.isArray(o);
   s.cond = obj(s.cond) ? s.cond : {};

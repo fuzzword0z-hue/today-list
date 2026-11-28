@@ -1484,3 +1484,8 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 .cw-more { margin-top: 4px; }
 .cw-more summary { min-height: 40px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; }
 
+
+/* ───────── 일정: 여러 날 (여행 등) ───────── */
+#ev-end-field #ev-end { flex: 1; }
+#ev-end-btn.wide { flex: 1; text-align: right; }
+.mg-ev.cont { border-left-color: transparent; opacity: .85; }

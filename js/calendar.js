@@ -179,7 +179,7 @@ function renderMonthGrid(start, end) {
     if (wd === 6) cls.push('sat');
     html += `<button class="${cls.join(' ')}" data-k="${k}" aria-label="${mdw(k)}${off ? ' 쉬는 날' : ''} 일정 ${evs.length}개"${offEdit ? ` aria-pressed="${off}"` : ''}>
       <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}${sym ? '<i class="sym"></i>' : ''}${off ? '<i class="off-mark">휴</i>' : ''}</span>
-      ${shown.slice(0, 2).map((ev) => `<span class="mg-ev cat-${ev.cat}">${esc(ev.title)}</span>`).join('')}
+      ${shown.slice(0, 2).map((ev) => `<span class="mg-ev cat-${ev.cat}${ev.end && k > ev.date ? ' cont' : ''}">${esc(ev.title)}</span>`).join('')}
       ${shown.length > 2 ? `<span class="mg-more">+${shown.length - 2}</span>` : ''}
       ${tasks}
     </button>`;
@@ -242,15 +242,15 @@ bindEventList($('day-panel'));
 function renderUpcoming() {
   const limit = addDays(today, UPCOMING_DAYS);
   const list = state.events
-    .filter((ev) => !ev.rep && !ev.of && !isDose(ev) && ev.date >= today && ev.date <= limit)
+    .filter((ev) => !ev.rep && !ev.of && !isDose(ev) && (ev.end || ev.date) >= today && ev.date <= limit) // 여러 날 일정은 끝날 때까지
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
     .slice(0, 6);
   $('upcoming').innerHTML = list.length
     ? `<h2 class="sub-head">다가오는 일정</h2><ul class="up-list">${list.map((ev) => `
-      <li class="up cat-${ev.cat}" data-k="${ev.date}" tabindex="0" role="button">
-        <span class="dday">${dday(ev.date)}</span>
+      <li class="up cat-${ev.cat}" data-k="${ev.date < today ? today : ev.date}" tabindex="0" role="button">
+        <span class="dday">${ev.date < today ? `${diffDays(today, ev.date) + 1}일째` : dday(ev.date)}</span>
         <span class="up-body"><span class="up-title">${esc(ev.title)}</span>
-          <span class="up-sub">${mdw(ev.date)}${ev.time ? ` ${ev.time}` : ''} · ${CATS[ev.cat].label}</span></span>
+          <span class="up-sub">${mdw(ev.date)}${ev.end ? `–${mdw(ev.end)} (${spanDays(ev)}일)` : ''}${ev.time ? ` ${ev.time}` : ''} · ${CATS[ev.cat].label}</span></span>
       </li>`).join('')}</ul>`
     : '';
 }

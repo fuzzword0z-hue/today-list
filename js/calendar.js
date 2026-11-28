@@ -148,12 +148,41 @@ function renderMonthGrid(start, end) {
     .map((w, i) => `<div class="mg-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
   html += '<div class="mg-cell blank"></div>'.repeat(lead);
 
+  // 여러 날 일정(7-28): 달마다 줄(lane)을 정해 같은 높이에 한 줄로 잇는다. 겹치는 일정은 다른 줄로
+  const spans = state.events.filter((ev) => ev.end && !ev.rep && ev.date <= end && ev.end >= start)
+    .sort((a, b) => a.date.localeCompare(b.date) || b.end.localeCompare(a.end) || a.id.localeCompare(b.id));
+  const laneEnd = [];
+  const laneOf = new Map();
+  for (const ev of spans) {
+    let i = laneEnd.findIndex((e) => e < ev.date);
+    if (i < 0) i = laneEnd.length;
+    laneEnd[i] = ev.end;
+    laneOf.set(ev.id, i);
+  }
+  // 이어지는 막대 한 칸: 첫날 · 그 주 첫 칸(일요일) · 달 첫날에만 이름을 쓰고, 그 주 안에서 이어지는 날 수만큼 이름이 걸쳐진다
+  const bar = (ev, k) => {
+    const wd = parse(k).getDay();
+    const head = k === ev.date || wd === 0 || k === start;
+    const n = head ? Math.min(diffDays(ev.end, k), 6 - wd, diffDays(end, k)) + 1 : 0;
+    const cls = ['mg-ev', 'mg-bar', `cat-${ev.cat}`];
+    if (k > ev.date) cls.push(wd === 0 ? 'in-l row-l' : 'in-l');
+    if (k < ev.end) cls.push(wd === 6 ? 'in-r row-r' : 'in-r');
+    return `<span class="${cls.join(' ')}">&nbsp;${head ? `<span class="mg-bar-t" style="--n:${n}">${esc(ev.title)}</span>` : ''}</span>`;
+  };
+
   let doseSeen = false, skipSeen = false, symSeen = false, offSeen = false;
   for (let k = start; k <= end; k = addDays(k, 1)) {
     const evs = eventsOn(k);
     // 반복 케어(투약)는 칸을 차지하지 않게 날짜 옆 작은 알약 표시로만 보여 준다
     const doses = evs.filter(isDose);
-    const shown = evs.filter((ev) => !isDose(ev));
+    const rest = evs.filter((ev) => !isDose(ev));
+    // 여러 날 일정을 먼저 제 줄에 (그 줄이 비면 빈 칸으로 높이를 맞춘다), 그다음 하루짜리
+    const bars = rest.filter((ev) => laneOf.has(ev.id));
+    const slots = [];
+    const top = bars.length ? Math.max(...bars.map((ev) => laneOf.get(ev.id))) : -1;
+    for (let i = 0; i <= top; i++) slots.push(bars.find((ev) => laneOf.get(ev.id) === i) || null);
+    const shown = [...slots, ...rest.filter((ev) => !laneOf.has(ev.id))];
+    const hidden = shown.slice(2).filter(Boolean).length;
     let dose = '';
     if (doses.length) {
       doseSeen = true;
@@ -179,8 +208,9 @@ function renderMonthGrid(start, end) {
     if (wd === 6) cls.push('sat');
     html += `<button class="${cls.join(' ')}" data-k="${k}" aria-label="${mdw(k)}${off ? ' 쉬는 날' : ''} 일정 ${evs.length}개"${offEdit ? ` aria-pressed="${off}"` : ''}>
       <span class="mg-top"><span class="mg-num">${parse(k).getDate()}</span>${dose}${sym ? '<i class="sym"></i>' : ''}${off ? '<i class="off-mark">휴</i>' : ''}</span>
-      ${shown.slice(0, 2).map((ev) => `<span class="mg-ev cat-${ev.cat}${ev.end && k > ev.date ? ' cont' : ''}">${esc(ev.title)}</span>`).join('')}
-      ${shown.length > 2 ? `<span class="mg-more">+${shown.length - 2}</span>` : ''}
+      ${shown.slice(0, 2).map((ev) => (!ev ? '<span class="mg-ev mg-gap" aria-hidden="true">&nbsp;</span>'
+        : laneOf.has(ev.id) ? bar(ev, k) : `<span class="mg-ev cat-${ev.cat}">${esc(ev.title)}</span>`)).join('')}
+      ${hidden ? `<span class="mg-more">+${hidden}</span>` : ''}
       ${tasks}
     </button>`;
   }

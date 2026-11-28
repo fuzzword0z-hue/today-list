@@ -1488,4 +1488,13 @@ li[role="button"]:focus-visible, .h-tg:focus-visible, .wo-cell:focus-visible { o
 /* ───────── 일정: 여러 날 (여행 등) ───────── */
 #ev-end-field #ev-end { flex: 1; }
 #ev-end-btn.wide { flex: 1; text-align: right; }
-.mg-ev.cont { border-left-color: transparent; opacity: .85; }
+/* 달력: 여러 날 일정은 칸 사이 틈(2px)까지 덮어 한 줄로 잇고, 이름은 한 번만 (그 주 안에서 이어지는 칸 위로 걸친다) */
+.mg-cell { overflow: visible; }
+.mg-top { overflow: hidden; }
+.mg-bar { position: relative; overflow: visible; }
+.mg-bar.in-l { margin-left: -3px; border-left-color: transparent; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.mg-bar.in-l.row-l { margin-left: -2px; }
+.mg-bar.in-r { margin-right: -3px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.mg-bar.in-r.row-r { margin-right: -2px; }
+.mg-bar-t { position: absolute; z-index: 1; left: 3px; top: 1px; width: calc(var(--n) * (100% + 5px) - 12px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
+.mg-gap { visibility: hidden; }
